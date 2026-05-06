@@ -294,6 +294,26 @@
                     <h3 class="text-xs font-black text-white/50 uppercase italic flex items-center gap-2"><i class="fas fa-link"></i> Sync Manager</h3>
                     <input id="main-spreadsheet-url" type="text" class="w-full bg-black border border-slate-700 rounded p-2 text-[10px] text-emerald-300 outline-none" value="">
                     <button id="sync-all-btn-action" class="w-full bg-indigo-600 text-white text-[10px] py-3 rounded-lg font-black uppercase">Refresh & Sync Now</button>
+                    <div id="runtime-config-panel" class="hidden bg-black/20 border border-white/5 rounded-xl p-3 space-y-3">
+                        <div class="space-y-1">
+                            <p class="text-[9px] text-white/40 uppercase font-black">Problem URL</p>
+                            <input id="problem-url-display" type="text" readonly class="w-full bg-black border border-slate-700 rounded p-2 text-[10px] text-cyan-300 outline-none" value="">
+                            <div class="flex gap-2">
+                                <a id="problem-url-open" href="#" target="_blank" rel="noopener noreferrer" class="hidden flex-1 bg-cyan-600/20 text-cyan-200 py-2 rounded-lg font-black uppercase text-[10px] text-center border border-cyan-500/30">Open</a>
+                                <button id="problem-url-copy-btn" class="flex-1 bg-white/10 text-white py-2 rounded-lg font-black uppercase text-[10px] border border-white/10">Copy</button>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                            <div class="bg-slate-900/40 rounded-lg p-2 border border-white/5">
+                                <p class="text-[8px] text-white/35 uppercase font-black">EXP Cap</p>
+                                <p id="exp-cap-status-display" class="text-[10px] text-amber-300 font-bold">--</p>
+                            </div>
+                            <div class="bg-slate-900/40 rounded-lg p-2 border border-white/5">
+                                <p class="text-[8px] text-white/35 uppercase font-black">Duplicate Guard</p>
+                                <p id="duplicate-window-display" class="text-[10px] text-emerald-300 font-bold">--</p>
+                            </div>
+                        </div>
+                    </div>
                     <div id="sync-error-display" class="hidden"></div>
                 </div>
             </div>
@@ -427,6 +447,7 @@
         let questionStats = {};
         let rankingData = [];
         let selectedGoal = 80;
+        let runtimeConfigState = null;
 
         // ステータスメッセージのリスト（20個）
         const STATUS_MESSAGES = [
@@ -507,6 +528,66 @@
 
         const getEl = (id) => document.getElementById(id);
         const setOnClick = (id, fn) => { const el = getEl(id); if (el) el.onclick = fn; };
+
+        function updateRuntimeConfigUI(config) {
+            runtimeConfigState = config || null;
+            const panel = getEl('runtime-config-panel');
+            const urlDisplay = getEl('problem-url-display');
+            const openLink = getEl('problem-url-open');
+            const expCapEl = getEl('exp-cap-status-display');
+            const duplicateEl = getEl('duplicate-window-display');
+            if (!panel || !urlDisplay || !openLink || !expCapEl || !duplicateEl) return;
+
+            if (!config) {
+                panel.classList.add('hidden');
+                urlDisplay.value = '';
+                openLink.classList.add('hidden');
+                openLink.href = '#';
+                expCapEl.innerText = '--';
+                duplicateEl.innerText = '--';
+                return;
+            }
+
+            panel.classList.remove('hidden');
+            const problemUrl = String(config.problemUrl || '').trim();
+            urlDisplay.value = problemUrl;
+            if (problemUrl) {
+                openLink.href = problemUrl;
+                openLink.classList.remove('hidden');
+            } else {
+                openLink.href = '#';
+                openLink.classList.add('hidden');
+            }
+
+            if (config.disableExpCaps) {
+                expCapEl.innerText = 'OFF';
+            } else {
+                const perfectCap = Number(config.perSetPerfectCap) || 0;
+                const dailyLimit = Number(config.dailyGrantLimit) || 0;
+                expCapEl.innerText = `ON / perfect ${perfectCap} / daily ${dailyLimit}`;
+            }
+
+            const windowSec = Number(config.duplicateLogWindowSec) || 0;
+            duplicateEl.innerText = `${windowSec} sec`;
+        }
+
+        async function copyProblemUrl() {
+            const problemUrl = String((runtimeConfigState && runtimeConfigState.problemUrl) || '').trim();
+            if (!problemUrl) {
+                showModal("Problem URL", "設定シートに problemUrl が未設定です。");
+                return;
+            }
+            try {
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    await navigator.clipboard.writeText(problemUrl);
+                    showModal("Problem URL", "URLをコピーしました。");
+                    return;
+                }
+            } catch (e) {
+                console.error('problemUrl copy failed:', e);
+            }
+            showModal("Problem URL", problemUrl);
+        }
 
         // KaTeX数式レンダリング関数（より確実な方法）
         function renderMath(element, maxAttempts = 30) {
@@ -2322,6 +2403,7 @@
                         }; 
                     }); 
                 }
+                updateRuntimeConfigUI(result.config || null);
                 if(result.history) userHistory = result.history; 
                 if(result.ranking) {
                     rankingData = result.ranking;
@@ -2394,6 +2476,7 @@
 
         window.onload = () => {
             initUserInfo();
+            updateRuntimeConfigUI(null);
             
             // 復習システムの情報をローカルストレージから読み込む
             try {
@@ -2463,6 +2546,7 @@
             });
             setOnClick('sync-all-btn-action', () => window.syncAllFromSpreadsheet(false)); 
             setOnClick('cloud-sync-toggle-btn', () => { const area = getEl('sync-area'); if (area) area.classList.toggle('hidden'); }); 
+            setOnClick('problem-url-copy-btn', copyProblemUrl);
         };
     </script>
 </body>

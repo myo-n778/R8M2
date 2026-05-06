@@ -56,6 +56,25 @@ GitHub Pagesは既に有効になっています。変更をプッシュする�
      - **TSV形式（推奨）**: タブ区切りで、列構成は「問題、選択肢1、選択肢2、選択肢3、選択肢4、...、正解番号、解説」
      - **CSV形式**: カンマ区切りで、「問題、答え」の2列
 
+3. **設定** シートは任意
+   - 列構成：
+     - A列: キー
+     - B列: 値
+   - 現在使える主なキー：
+     - `problemUrl`
+     - `disableExpCaps`
+     - `perSetPerfectCap`
+     - `dailyGrantLimit`
+     - `duplicateLogWindowSec`
+   - 例：
+     ```
+     problemUrl    https://myo-n778.github.io/R8M2/problemset/
+     disableExpCaps    true
+     perSetPerfectCap    5
+     dailyGrantLimit    2
+     duplicateLogWindowSec    60
+     ```
+
 ### 3. HTMLファイルの設定確認
 
 `science2.0.html` の以下の設定を確認：

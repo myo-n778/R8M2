@@ -41,7 +41,8 @@ function readRuntimeConfigFromSheet(ss) {
     perSetPerfectCap: Number((globalThis.SCIENCE_EXP_CONFIG || {}).perSetPerfectCap) || 5,
     dailyGrantLimit: Number((globalThis.SCIENCE_EXP_CONFIG || {}).dailyGrantLimit) || 2,
     disableExpCaps: !!((globalThis.SCIENCE_EXP_CONFIG || {}).disableExpCaps),
-    duplicateLogWindowSec: 60
+    duplicateLogWindowSec: 60,
+    problemUrl: ""
   };
   try {
     const configSheet = ss.getSheetByName("設定");
@@ -65,11 +66,16 @@ function readRuntimeConfigFromSheet(ss) {
       const n = Number(v);
       return isNaN(n) ? fallback : n;
     };
+    const parseText = function(v, fallback) {
+      const s = String(v || '').trim();
+      return s === '' ? fallback : s;
+    };
     return {
       perSetPerfectCap: parseNum(map.perSetPerfectCap, defaults.perSetPerfectCap),
       dailyGrantLimit: parseNum(map.dailyGrantLimit, defaults.dailyGrantLimit),
       disableExpCaps: parseBool(map.disableExpCaps, defaults.disableExpCaps),
-      duplicateLogWindowSec: parseNum(map.duplicateLogWindowSec, defaults.duplicateLogWindowSec)
+      duplicateLogWindowSec: parseNum(map.duplicateLogWindowSec, defaults.duplicateLogWindowSec),
+      problemUrl: parseText(map.problemUrl, defaults.problemUrl)
     };
   } catch (e) {
     // 設定シート不備では処理を止めず、既定値で継続する
@@ -357,7 +363,15 @@ try {
 } catch (openError) {
   return returnJson({ error: "Invalid argument: id - スプレッドシートが見つかりません。IDを確認してください: " + openError.toString() });
 }
+const runtimeConfig = readRuntimeConfigFromSheet(ss);
 const result = { problems: {}, userStats: {}, history: [], ranking: [], currentStreak: 0, maxStreak: 0, sheetOrder: [] };
+result.config = {
+  problemUrl: runtimeConfig.problemUrl || "",
+  perSetPerfectCap: Number(runtimeConfig.perSetPerfectCap) || 5,
+  dailyGrantLimit: Number(runtimeConfig.dailyGrantLimit) || 2,
+  disableExpCaps: !!runtimeConfig.disableExpCaps,
+  duplicateLogWindowSec: Number(runtimeConfig.duplicateLogWindowSec) || 60
+};
 
 // システム用シートを除外するリスト
 const excludeSheets = ["履歴ログ", "詳細履歴ログ", "問題別統計DB", "成績一覧", "メンバー一覧", "設定"];
