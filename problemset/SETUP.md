@@ -4,8 +4,8 @@
 
 GitHub Pagesで公開する場合、以下のURLでアクセスできます：
 
-- メインページ: https://myo-n778.github.io/R8M2/problemset/
-- 直接アクセス: https://myo-n778.github.io/R8M2/problemset/science2.0.html
+- メインページ: https://myo-n778.github.io/R8M2/
+- 直接アクセス: https://myo-n778.github.io/R8M2/science2.0.html
 
 GitHub Pagesは既に有効になっています。変更をプッシュすると、数分で反映されます。
 
@@ -61,14 +61,14 @@ GitHub Pagesは既に有効になっています。変更をプッシュする�
      - A列: キー
      - B列: 値
    - 現在使える主なキー：
-     - `problemUrl`
+     - `appUrl`
      - `disableExpCaps`
      - `perSetPerfectCap`
      - `dailyGrantLimit`
      - `duplicateLogWindowSec`
    - 例：
      ```
-     problemUrl    https://myo-n778.github.io/R8M2/problemset/
+     appUrl    https://myo-n778.github.io/R8M2/problemset/science2.0.html
      disableExpCaps    true
      perSetPerfectCap    5
      dailyGrantLimit    2

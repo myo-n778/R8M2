@@ -42,7 +42,7 @@ function readRuntimeConfigFromSheet(ss) {
     dailyGrantLimit: Number((globalThis.SCIENCE_EXP_CONFIG || {}).dailyGrantLimit) || 2,
     disableExpCaps: !!((globalThis.SCIENCE_EXP_CONFIG || {}).disableExpCaps),
     duplicateLogWindowSec: 60,
-    problemUrl: ""
+    appUrl: ""
   };
   try {
     const configSheet = ss.getSheetByName("設定");
@@ -75,7 +75,7 @@ function readRuntimeConfigFromSheet(ss) {
       dailyGrantLimit: parseNum(map.dailyGrantLimit, defaults.dailyGrantLimit),
       disableExpCaps: parseBool(map.disableExpCaps, defaults.disableExpCaps),
       duplicateLogWindowSec: parseNum(map.duplicateLogWindowSec, defaults.duplicateLogWindowSec),
-      problemUrl: parseText(map.problemUrl, defaults.problemUrl)
+      appUrl: parseText(map.appUrl || map.problemUrl, defaults.appUrl)
     };
   } catch (e) {
     // 設定シート不備では処理を止めず、既定値で継続する
@@ -366,7 +366,7 @@ try {
 const runtimeConfig = readRuntimeConfigFromSheet(ss);
 const result = { problems: {}, userStats: {}, history: [], ranking: [], currentStreak: 0, maxStreak: 0, sheetOrder: [] };
 result.config = {
-  problemUrl: runtimeConfig.problemUrl || "",
+  appUrl: runtimeConfig.appUrl || "",
   perSetPerfectCap: Number(runtimeConfig.perSetPerfectCap) || 5,
   dailyGrantLimit: Number(runtimeConfig.dailyGrantLimit) || 2,
   disableExpCaps: !!runtimeConfig.disableExpCaps,
