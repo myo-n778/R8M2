@@ -1,0 +1,2469 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>SCIENCE 2026 Deep Learning Pro+ (Ultra) Master</title>
+    <!-- KaTeX for LaTeX math rendering -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI+WdtXRGWt2kTvGFasHpSy3SV" crossorigin="anonymous">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG+vnGctmUb0ZY0l8" crossorigin="anonymous"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js" integrity="sha384-+VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4+/RRE05" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=Orbitron:wght@400;700;900&family=Cinzel:wght@700&display=swap');
+        
+        :root {
+            --bg-deep: #0f172a;
+            --panel-bg: rgba(30, 41, 59, 0.85);
+            --accent-primary: #6366f1;
+            --accent-emerald: #10b981;
+            --accent-rose: #f43f5e;
+            --accent-amber: #f59e0b;
+            --accent-cyan: #00f2ff;
+            --text-main: #f8fafc;
+        }
+
+        body { font-family: 'Noto Sans JP', sans-serif; background-color: var(--bg-deep); color: var(--text-main); margin: 0; overflow-x: hidden; transition: background-color 0.5s ease; }
+        .font-flashy { font-family: 'Orbitron', sans-serif; }
+        .font-header { font-family: 'Cinzel', serif; }
+        .glass-panel { background: var(--panel-bg); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.1); transition: background-color 0.5s ease; box-shadow: none !important; }
+        
+        .option-btn { 
+            transition: all 0.2s; 
+            background: rgba(255, 255, 255, 0.05); 
+            padding: 0.85rem 1.2rem !important; 
+            min-height: 3.5rem; 
+            line-height: 1.4; 
+            display: flex; 
+            align-items: center; 
+            justify-content: flex-start;
+            text-align: left;
+            font-size: 0.95rem; 
+            border: 1px solid rgba(255,255,255,0.05); 
+            border-radius: 0.75rem; 
+            width: 100%; 
+            color: var(--text-main);
+        }
+        .option-btn:not(:disabled):hover { background: rgba(255, 255, 255, 0.1); transform: translateX(6px); border-color: var(--accent-primary); }
+        
+        .explanation-card { line-height: 1.6; border-left: 4px solid var(--accent-primary); }
+        .fade-in { animation: fadeIn 0.4s ease-out forwards; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        
+        .progress-dot { width: 8px; height: 8px; border-radius: 50%; background: rgba(255, 255, 255, 0.1); transition: all 0.3s; }
+        .dot-correct { background: var(--accent-emerald); }
+        .dot-wrong { background: var(--accent-rose); }
+        .dot-active { background: var(--accent-primary); transform: scale(1.3); }
+        
+        .group-header { background: rgba(255, 255, 255, 0.08); padding: 0.9rem 1.2rem; margin-bottom: 4px; cursor: pointer; font-weight: 900; font-size: 0.85rem; color: var(--text-main); display: flex; justify-content: space-between; border-radius: 12px; }
+        .era-header { background: rgba(255, 255, 255, 0.03); border-left: 3px solid var(--accent-primary); padding: 0.75rem 1rem; cursor: pointer; display: flex; justify-content: space-between; margin: 4px 4px 4px 12px; border-radius: 6px; font-size: 0.85rem; }
+        
+        .expanded { max-height: 3000px !important; opacity: 1 !important; visibility: visible !important; padding-bottom: 0.5rem; transition: all 0.3s ease-in-out; }
+        .era-content { transition: all 0.3s ease-in-out; }
+        #custom-modal { display: none; position: fixed; inset: 0; z-index: 10000; background: rgba(0,0,0,0.8); backdrop-filter: blur(4px); align-items: center; justify-content: center; padding: 1.5rem; }
+        #custom-modal.active { display: flex; }
+        #registration-modal { display: none; position: fixed; inset: 0; z-index: 11000; background: rgba(0,0,0,0.9); backdrop-filter: blur(10px); align-items: center; justify-content: center; padding: 1rem; }
+        #registration-modal.active { display: flex; }
+        #status-modal { z-index: 12000; }
+        
+        .neural-level-badge { background: linear-gradient(135deg, var(--accent-primary), #a855f7); color: white; padding: 2px 10px; border-radius: 4px; font-family: 'Orbitron', sans-serif; font-size: 10px; font-weight: 900; }
+        /* ランキングの横スクロール対応案1 (CSSのみで解決) */
+        .ranking-card { 
+            background: rgba(255, 255, 255, 0.03); 
+            border: 1px solid rgba(255, 255, 255, 0.05); 
+            border-radius: 1rem; 
+            padding: 0.75rem; 
+            margin-top: 1rem; 
+            box-shadow: none !important;
+            overflow-x: auto;
+            overflow-y: auto;
+            max-height: 400px;
+            scrollbar-width: thin;
+        }
+        .ranking-card::-webkit-scrollbar { height: 4px; width: 4px; }
+        .ranking-card::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 10px; }
+        .ranking-card::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.02); }
+        
+        /* 中のグリッドが適切な幅になるように固定（status列まで含めて広めに設定） */
+        .ranking-card .grid { 
+            min-width: 1000px; 
+        }
+        /* status列の横スクロール対応 */
+        .ranking-status-cell {
+            overflow-x: auto;
+            overflow-y: hidden;
+            white-space: nowrap;
+            scrollbar-width: thin;
+            -ms-overflow-style: none;
+        }
+        .ranking-status-cell::-webkit-scrollbar {
+            height: 2px;
+        }
+        .ranking-status-cell::-webkit-scrollbar-thumb {
+            background: rgba(255,255,255,0.2);
+            border-radius: 10px;
+        }
+        .goal-btn { transition: all 0.3s; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); color: #94a3b8; font-family: 'Orbitron', sans-serif; box-shadow: none !important; }
+        .goal-btn.active { background: var(--accent-primary); border-color: white; color: white; }
+        
+        /* レベルアップ後の点滅アニメーション（金色） */
+        @keyframes levelUpBlink {
+            0%, 100% { color: #fbbf24; text-shadow: 0 0 10px rgba(251, 191, 36, 0.8); }
+            50% { color: #fcd34d; text-shadow: 0 0 20px rgba(252, 211, 77, 1); }
+        }
+        .level-up-blink {
+            animation: levelUpBlink 1s ease-in-out infinite;
+        }
+        
+        /* レベルアップが近いときの点滅アニメーション（紫/ピンク） */
+        @keyframes nearLevelUpBlink {
+            0%, 100% { color: #a855f7; text-shadow: 0 0 8px rgba(168, 85, 247, 0.6); }
+            50% { color: #ec4899; text-shadow: 0 0 15px rgba(236, 72, 153, 0.8); }
+        }
+        .near-level-up-blink {
+            animation: nearLevelUpBlink 1.5s ease-in-out infinite;
+        }
+
+        .theme-swatch { width: 26px; height: 26px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.2); cursor: pointer; transition: transform 0.2s; position: relative; }
+        .theme-swatch:hover { transform: scale(1.15); }
+        .theme-swatch.active::after { content: '\f00c'; font-family: 'Font Awesome 6 Free'; font-weight: 900; color: white; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 10px; text-shadow: 0 0 2px black; }
+
+        /* フッター用特別スタイル */
+        footer {
+            background: linear-gradient(to top, rgba(0, 0, 0, 0.4) 0%, transparent 100%);
+            border-top: 1px solid rgba(255, 255, 255, 0.03);
+            position: relative;
+        }
+        footer::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 150px;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--accent-primary), transparent);
+        }
+        .credit-glow-primary { color: var(--accent-primary); text-shadow: 0 0 8px rgba(99, 102, 241, 0.6); }
+        .credit-glow-amber { color: var(--accent-amber); text-shadow: 0 0 8px rgba(245, 158, 11, 0.6); }
+        .credit-glow-cyan { color: var(--accent-cyan); text-shadow: 0 0 8px rgba(0, 242, 255, 0.6); }
+        .copyright-text { letter-spacing: 0.4em; opacity: 0.3; transition: opacity 0.3s; }
+        footer:hover .copyright-text { opacity: 0.6; }
+        
+        /* KaTeX数式のスタイル調整 */
+        .katex { font-size: 1.1em; }
+        .katex-display { margin: 1em 0; }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+    <!-- 登録 -->
+    <div id="registration-modal">
+        <div class="glass-panel p-8 rounded-[2rem] max-w-sm w-full text-center space-y-6">
+            <h3 class="text-xl font-black text-white italic font-flashy">Registration</h3>
+            <p class="text-slate-400 text-sm">あなたの情報を登録してください。</p>
+            <div class="space-y-3">
+                <div class="space-y-2">
+                    <label class="text-[10px] text-slate-300 uppercase font-bold block text-left">クラス</label>
+                    <select id="user-class-select" class="w-full bg-black border border-indigo-500/50 rounded-xl p-3 text-center text-white outline-none font-bold">
+                        <option value="">選択してください</option>
+                        <option value="菊">菊</option>
+                        <option value="桜">桜</option>
+                    </select>
+                </div>
+                <div class="space-y-2">
+                    <label class="text-[10px] text-slate-300 uppercase font-bold block text-left">番号</label>
+                    <input id="user-number-input" type="text" class="w-full bg-black border border-indigo-500/50 rounded-xl p-3 text-center text-white outline-none font-bold" placeholder="1~40" maxlength="2" pattern="[0-9]*" inputmode="numeric" oninput="this.value = this.value.replace(/[^0-9]/g, '')">
+                    <p class="text-[9px] text-amber-400 italic">※半角数字で1~40の範囲で入力してください</p>
+                </div>
+                <div class="space-y-2">
+                    <label class="text-[10px] text-slate-300 uppercase font-bold block text-left">名前</label>
+                    <input id="user-name-input" type="text" class="w-full bg-black border border-indigo-500/50 rounded-xl p-3 text-center text-white outline-none font-bold" placeholder="SCHOLAR NAME">
+                </div>
+                <p id="id-annotation" class="text-[10px] text-cyan-400 italic font-bold">※記録は名前に紐付けされます。</p>
+            </div>
+            <button id="register-btn" class="w-full bg-indigo-600 text-white py-3 rounded-xl font-black uppercase hover:bg-indigo-500 transition-all">Connect to Hub</button>
+        </div>
+    </div>
+
+    <!-- ステータス -->
+    <div id="custom-modal">
+        <div class="glass-panel p-8 rounded-[2rem] max-w-sm w-full text-center space-y-6">
+            <h3 id="modal-title" class="text-lg font-black text-white italic">Status</h3>
+            <p id="modal-message" class="text-slate-300 text-sm leading-relaxed"></p>
+            <button id="modal-close-btn" onclick="window.closeModal()" class="w-full bg-slate-800 text-slate-300 py-3 rounded-xl font-bold uppercase text-xs">Close</button>
+        </div>
+    </div>
+
+    <!-- ステータス入力モーダル -->
+    <div id="status-modal" class="hidden fixed inset-0 z-[12000] bg-black/90 backdrop-blur-md flex items-center justify-center p-4">
+        <div class="glass-panel p-6 md:p-8 rounded-[2rem] max-w-lg w-full max-h-[80vh] overflow-y-auto">
+            <h3 class="text-xl font-black text-white italic font-flashy mb-4">Status Message</h3>
+            <p class="text-slate-400 text-sm mb-4">自分や仲間を鼓舞するメッセージを選択してください</p>
+            <div id="status-messages-grid" class="grid grid-cols-1 gap-2 mb-4"></div>
+            <div id="status-custom-input-area" class="hidden mb-4">
+                <input id="status-custom-input" type="text" class="w-full bg-black/50 border border-indigo-500/50 rounded-xl p-3 text-white outline-none font-bold mb-2" placeholder="カスタムメッセージを入力..." maxlength="50">
+                <div class="flex gap-2">
+                    <button id="status-custom-save-btn" class="flex-1 bg-indigo-600 text-white py-2 rounded-xl font-bold uppercase text-xs hover:bg-indigo-500 transition-all">保存</button>
+                    <button id="status-custom-cancel-btn" class="flex-1 bg-slate-800 text-slate-300 py-2 rounded-xl font-bold uppercase text-xs hover:bg-slate-700 transition-all">キャンセル</button>
+                </div>
+            </div>
+            <button id="status-close-btn" onclick="window.closeStatusModal()" class="w-full bg-slate-800 text-slate-300 py-3 rounded-xl font-bold uppercase text-xs">Close</button>
+        </div>
+    </div>
+
+    <!-- メイン -->
+    <div id="app" class="max-w-4xl xl:max-w-[1450px] mx-auto w-full flex-grow px-3 py-3 md:p-8 flex flex-col">
+        <div id="home-screen" class="fade-in">
+            <!-- ヘッダーエリア -->
+            <div class="text-center md:text-left space-y-2 mb-0 pb-0">
+                <h1 class="text-3xl md:text-6xl font-header tracking-tighter text-white whitespace-nowrap">SCIENCE <span id="app-version-display" class="font-flashy text-2xl md:text-4xl" style="color: var(--accent-primary)">2026 ULTRA Master <span class="text-[0.4em] md:text-[0.7em] opacity-70 font-normal">for 102th</span></span></h1>
+                <div class="flex flex-wrap justify-center md:justify-start items-center gap-2">
+                    <button id="active-user-display" class="bg-white/10 text-white text-[10px] px-4 py-1 rounded-full border border-white/20 font-black italic cursor-pointer transition-all hover:opacity-80">LOADING...</button>
+                    <button id="question-shuffle-display" class="bg-white/10 text-white text-[10px] px-4 py-1 rounded-full border border-white/20 font-black italic cursor-pointer transition-all hover:opacity-80">SHUFFLE OFF</button>
+                    <span id="neural-level-display" class="neural-level-badge">LV. 00</span>
+                    <span id="current-rank-display" class="bg-white/10 text-white text-[10px] px-4 py-1 rounded-full border border-white/20 font-black italic">RANK --</span>
+                    <div class="flex items-center gap-1.5 ml-0 md:ml-2 pl-2 border-l border-white/10 flex-shrink-0">
+                        <label class="text-[8px] font-black text-amber-400 uppercase italic flex items-center gap-1 whitespace-nowrap"><i class="fas fa-bullseye"></i> Target</label>
+                        <div class="flex gap-0.5">
+                            <button onclick="setGoal(60)" id="goal-60" class="goal-btn px-1.5 py-0.5 rounded-md text-[8px] font-bold">60%</button>
+                            <button onclick="setGoal(80)" id="goal-80" class="goal-btn px-1.5 py-0.5 rounded-md text-[8px] font-bold active">80%</button>
+                            <button onclick="setGoal(100)" id="goal-100" class="goal-btn px-1.5 py-0.5 rounded-md text-[8px] font-bold">100%</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex flex-wrap justify-center md:justify-start items-center gap-2">
+                    <button id="user-status-display" class="bg-white/10 text-white text-[10px] px-4 py-1 rounded-full border border-white/20 font-black italic cursor-pointer transition-all hover:opacity-80">status</button>
+                    <button id="logout-btn" class="bg-white/10 text-white text-[10px] px-3 py-1 rounded-full border border-white/20 font-black italic cursor-pointer transition-all hover:opacity-80">LOGOUT</button>
+                    <span id="last-attempt-display" class="bg-cyan-500/20 text-cyan-200 text-[9px] px-3 py-1 rounded-full border border-cyan-400/40 font-medium"></span>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 xl:grid-cols-[minmax(0,2.2fr)_minmax(420px,1fr)] gap-4 md:gap-6 mt-0">
+                <div class="lg:col-span-2 xl:col-span-1 space-y-4">
+                    <div class="glass-panel rounded-[1.5rem] md:rounded-[2.5rem] p-5 md:p-8 space-y-4">
+                        <div class="flex justify-between items-center">
+                            <h2 class="text-[10px] font-black uppercase flex items-center gap-2" style="color: var(--accent-primary)"><i class="fas fa-chart-area"></i> Neural Performance</h2>
+                            <div class="flex gap-2">
+                                <button onclick="window.toggleWeakList()" class="text-[9px] bg-rose-500/20 text-rose-300 px-3 py-1 rounded-full border border-rose-500/30 font-black uppercase"><i class="fas fa-search"></i> Weak Points</button>
+                                <button onclick="window.syncAllFromSpreadsheet(false)" class="text-[9px] bg-white/10 text-white px-3 py-1 rounded-full border border-white/20 font-black uppercase"><i class="fas fa-sync-alt"></i> Sync</button>
+                                <button id="cloud-sync-toggle-btn" class="text-[9px] bg-emerald-500/20 text-emerald-300 px-3 py-1 rounded-full border border-emerald-500/30 font-black uppercase"><i class="fas fa-palette"></i> Theme</button>
+                            </div>
+                        </div>
+                        <div style="position:relative; height:240px; width:100%; margin-top: 10px;"><canvas id="performanceChart"></canvas></div>
+                        <div class="grid grid-cols-2 md:grid-cols-3 gap-2">
+                            <div class="bg-slate-900/50 p-2 md:p-3 rounded-xl border border-white/5 text-center"><p class="text-[8px] text-slate-300 mb-0.5 uppercase font-bold">Total EXP</p><p id="total-neural-exp" class="text-sm md:text-lg font-flashy text-purple-400">0</p></div>
+                            <div class="bg-slate-900/50 p-2 md:p-3 rounded-xl border border-white/5 text-center"><p class="text-[8px] text-slate-300 mb-0.5 uppercase font-bold">10回平均</p><p id="recent-accuracy" class="text-sm md:text-lg font-flashy text-orange-400">--%</p></div>
+                            <div class="bg-slate-900/50 p-2 md:p-3 rounded-xl border border-white/5 text-center"><p class="text-[8px] text-slate-300 mb-0.5 uppercase font-bold">通算正答率</p><p id="best-accuracy" class="text-sm md:text-lg font-flashy text-emerald-400">--%</p></div>
+                            <div class="bg-slate-900/50 p-2 md:p-3 rounded-xl border border-white/5 text-center"><p class="text-[8px] text-slate-300 mb-0.5 uppercase font-bold">累計演習</p><p id="total-sessions-count" class="text-sm md:text-lg font-flashy text-white">0</p></div>
+                            <div class="bg-slate-900/50 p-2 md:p-3 rounded-xl border border-white/5 text-center"><p class="text-[8px] text-slate-300 mb-0.5 uppercase font-bold">現在連続</p><p id="current-streak-display" class="text-sm md:text-lg font-flashy text-amber-400">0</p></div>
+                            <div class="bg-slate-900/50 p-2 md:p-3 rounded-xl border border-white/5 text-center"><p class="text-[8px] text-slate-300 mb-0.5 uppercase font-bold">最大連続</p><p id="max-streak-display" class="text-sm md:text-lg font-flashy text-cyan-400">0</p></div>
+                        </div>
+                        <div id="ranking-card-wrapper" class="ranking-card space-y-2">
+                            <h3 class="text-[10px] font-black text-amber-400 uppercase italic flex items-center gap-2 mb-3"><i class="fas fa-trophy"></i> Top Scholars</h3>
+                            <div id="ranking-header" class="grid gap-3 items-center text-[8px] font-black text-white/40 uppercase border-b border-white/10 pb-1.5 mb-1" style="grid-template-columns: 30px auto 50px 35px 70px 70px 40px 50px 50px 140px auto;">
+                                <span class="text-center">RK</span><span>NAME</span><span class="text-left">EXP</span><span class="text-left">LV</span><span class="text-left">10th Ave.</span><span class="text-left">ALL Ave.</span><span class="text-left">SESS</span><span class="text-left">CST</span><span class="text-left">MST</span><span class="text-left">LAST</span><span class="text-left">STATUS</span>
+                            </div>
+                            <div id="ranking-container" class="space-y-1"></div>
+                        </div>
+                    </div>
+                    <div id="daily-stats-container" class="glass-panel rounded-[1.5rem] md:rounded-[2.5rem] p-4 md:p-6 space-y-3 max-h-[200px] overflow-y-auto"></div>
+                </div>
+
+                <div class="glass-panel rounded-[1.5rem] md:rounded-[2.5rem] p-6 md:p-8 space-y-6 flex flex-col">
+                    <label class="text-[10px] font-black uppercase italic" style="color: var(--accent-primary)">Session Library</label>
+                    <div class="relative flex-grow">
+                        <div id="era-menu-container" class="space-y-1.5 overflow-y-auto pr-1 max-h-[600px]"></div>
+                        <div id="era-scroll-fade" class="pointer-events-none absolute bottom-0 left-0 right-0 h-10 bg-gradient-to-t from-black/80 to-transparent hidden"></div>
+                    </div>
+                    <div id="era-scroll-hint" class="hidden text-[10px] text-slate-400 text-center">↓ 項目はスクロールできます</div>
+                </div>
+            </div>
+            
+            <div id="sync-area" class="hidden glass-panel rounded-[1.5rem] p-6 border-white/10 space-y-6 fade-in mt-6 md:mt-8">
+                <div class="space-y-4">
+                    <div class="flex justify-between items-center">
+                        <h3 class="text-xs font-black text-emerald-400 uppercase italic flex items-center gap-2"><i class="fas fa-palette"></i> Visual Focus Modes</h3>
+                        <span class="text-[8px] text-white/50 uppercase font-black">Scroll to explore</span>
+                    </div>
+                    <div id="theme-grid" class="grid grid-cols-10 gap-2 max-h-48 overflow-y-auto pr-2"></div>
+                </div>
+                <div class="space-y-2 pt-4 border-t border-white/5">
+                    <h3 class="text-xs font-black text-white/50 uppercase italic flex items-center gap-2"><i class="fas fa-link"></i> Sync Manager</h3>
+                    <input id="main-spreadsheet-url" type="text" class="w-full bg-black border border-slate-700 rounded p-2 text-[10px] text-emerald-300 outline-none" value="">
+                    <button id="sync-all-btn-action" class="w-full bg-indigo-600 text-white text-[10px] py-3 rounded-lg font-black uppercase">Refresh & Sync Now</button>
+                    <div id="sync-error-display" class="hidden"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 演習画面・リザルト画面などは変更なし -->
+        <div id="quiz-screen" class="hidden space-y-4 fade-in">
+            <div class="flex justify-between items-center px-1">
+                <div class="grid grid-cols-3 gap-2 flex-1">
+                    <div class="glass-panel p-2 rounded-xl text-center"><p class="text-[8px] text-slate-500 mb-0.5">Acc.</p><p id="current-accuracy" class="text-sm font-flashy" style="color: #818cf8;">0%</p></div>
+                    <div class="glass-panel p-2 rounded-xl text-center"><p class="text-[8px] text-slate-500 mb-0.5">Streak</p><p id="current-streak" class="text-sm font-flashy text-amber-400">0</p></div>
+                    <div class="glass-panel p-2 rounded-xl text-center"><p class="text-[8px] text-slate-500 mb-0.5">Prog.</p><p class="text-xs font-flashy text-white"><span id="q-current">1</span>/<span id="q-total">10</span></p></div>
+                </div>
+                <button id="abort-quiz-btn" onclick="window.abortQuiz()" class="ml-3 bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 px-4 py-2 rounded-xl text-[10px] font-black uppercase border border-rose-500/30 transition-all flex items-center gap-2">
+                    <i class="fas fa-times"></i> QUIT
+                </button>
+            </div>
+            <div id="dot-bar" class="flex justify-center gap-1 py-1"></div>
+            <div class="glass-panel rounded-[1.5rem] p-6 relative overflow-hidden">
+                <div id="goal-indicator" class="absolute top-0 left-0 h-1 transition-all duration-700" style="width: 0%; background: var(--accent-primary)"></div>
+                <div class="space-y-4">
+                    <div class="flex justify-between items-center"><span id="diff-badge" class="px-3 py-1 rounded-full text-[10px] font-black bg-white/5 text-slate-300 uppercase"></span><span id="q-history-stat" class="neural-level-badge text-[10px]">0% (0/0)</span></div>
+                    <h2 id="question-text" class="text-lg md:text-2xl font-bold leading-snug text-white whitespace-pre-wrap text-left"></h2>
+                    <div id="options-container" class="grid grid-cols-1 gap-2 pt-2"></div>
+                </div>
+            </div>
+            <div id="feedback-area" class="hidden space-y-4 fade-in">
+                <div class="flex flex-wrap items-center gap-4">
+                    <div id="result-badge" class="px-5 py-2 rounded-full text-[10px] font-black uppercase w-fit text-white"></div>
+                    <div id="voice-message" class="font-flashy text-xl md:text-3xl font-black italic tracking-tight" style="color: var(--accent-primary)"></div>
+                </div>
+                <div class="bg-white/5 rounded-[1.5rem] p-6 border border-white/10 shadow-inner"><div id="explanation-content" class="explanation-card text-slate-300 text-sm md:text-base whitespace-pre-line px-4"></div></div>
+                <button id="next-btn-action" class="w-full bg-white text-slate-900 font-black py-4 rounded-2xl text-lg flex justify-center items-center gap-4 group">PROCEED <i class="fas fa-chevron-right group-hover:translate-x-1 transition-transform"></i></button>
+            </div>
+        </div>
+
+        <div id="result-screen" class="hidden space-y-8 fade-in py-8">
+            <div class="glass-panel rounded-[2rem] p-10 text-center space-y-8 border-white/10 relative overflow-hidden">
+                <div id="final-icon" class="text-6xl mb-4">👑</div>
+                <h2 class="text-2xl md:text-5xl font-flashy tracking-tighter uppercase italic text-center">Neural Sync Complete</h2>
+                <div class="space-y-3">
+                    <p id="level-up-msg" class="text-amber-400 font-flashy text-xl md:text-3xl animate-pulse hidden">LEVEL UP! CONGRATULATIONS!</p>
+                    <p id="goal-eval-msg" class="text-[10px] font-black uppercase tracking-[0.3em] mb-2"></p>
+                    <p id="final-praise" class="font-flashy text-xs md:text-lg uppercase tracking-[0.3em]" style="color: var(--accent-primary)"></p>
+                    <p id="final-praise-jp" class="text-indigo-200 font-bold text-lg md:text-2xl mt-2 px-4 text-left"></p>
+                    <p id="final-message" class="text-slate-400 text-sm leading-relaxed max-w-lg mx-auto italic"></p>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="bg-slate-900/90 p-4 rounded-xl border-l-4" style="border-color: var(--accent-primary)"><p class="text-[8px] text-slate-500 font-black uppercase mb-1">Accuracy</p><p class="text-2xl font-flashy" style="color: var(--accent-primary)"><span id="final-score">0</span>%</p></div>
+                    <div class="bg-slate-900/90 p-4 rounded-xl border-l-4 border-amber-500"><p class="text-[8px] text-slate-500 font-black uppercase mb-1">EXP Gained</p><p id="final-exp-gained" class="text-2xl font-flashy text-amber-400">0</p><p id="final-exp-note" class="text-[10px] text-slate-400 mt-1 min-h-[14px]"></p></div>
+                </div>
+                <button onclick="window.showHome()" class="w-full text-white font-black py-4 rounded-2xl text-lg uppercase tracking-widest" style="background: var(--accent-primary)">Back to Hub</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- アップグレードされたフッター -->
+    <footer class="mt-auto pt-16 pb-12 text-center overflow-hidden">
+        <div class="max-w-4xl xl:max-w-[1450px] mx-auto px-6">
+            <p class="copyright-text font-flashy text-[8px] md:text-[9px] uppercase mb-6 text-white/40">
+                &copy; 2026 NEURAL SCIENCE SYSTEMS | <span class="text-indigo-400/60">HIGH SPEC EDITION</span> | ALL RIGHTS RESERVED.
+            </p>
+            
+            <div class="credit-badge font-flashy text-[10px] md:text-[11px] tracking-[0.2em] uppercase font-black italic flex flex-wrap justify-center items-center gap-y-3 gap-x-4">
+                <div class="flex items-center gap-1">
+                    <span class="text-white/20 text-[8px]">CREATED BY</span> 
+                    <span class="credit-glow-primary px-2 py-0.5 border border-indigo-500/20 rounded bg-indigo-500/5">Myo-n</span>
+                </div>
+                <div class="flex items-center gap-1">
+                    <span class="text-white/20 text-[8px]">USING</span> 
+                    <span class="credit-glow-amber">ChatGPT 5.2</span>
+                </div>
+                <div class="flex items-center gap-1">
+                    <span class="text-white/20 text-[8px]">AND</span> 
+                    <span class="credit-glow-cyan">Gemini 3.0</span>
+                </div>
+            </div>
+
+            <!-- 装飾的なライン -->
+            <div class="mt-8 flex justify-center gap-1 opacity-20">
+                <div class="w-1 h-1 bg-white rounded-full"></div>
+                <div class="w-12 h-[1px] bg-white self-center"></div>
+                <div class="w-1 h-1 bg-white rounded-full"></div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- 共通設定・共通関数 -->
+    <script src="./common/science-shared.js"></script>
+    <!-- スクリプト部分は以前のものを継続して使用 -->
+    <script>
+        const SHARED = window.ScienceShared || {};
+        const FIXED_GAS_URL = SHARED.gasUrl || "https://script.google.com/macros/s/AKfycbz-rUP1QhQL2KIrPy2zhjSqhJhwUiz1LiouHAgsf8Rw0hZVTre4FXQEzSO0T7tsMDEe/exec";
+        const FIXED_SPREADSHEET_URL = "https://docs.google.com/spreadsheets/d/1RtQyG5uFQX36yLth6IYuT56rVakQNvmdEILji1PSzYY/edit";
+        const normalizeUserName = SHARED.normalizeUserName || ((name) => name ? name.normalize('NFKC').trim() : '');
+        const formatDateYmd = SHARED.formatDateYmd || ((timestamp) => {
+            const ts = Number(timestamp) || 0;
+            if (ts <= 0) return '--';
+            const d = new Date(ts);
+            if (isNaN(d.getTime())) return '--';
+            return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`;
+        });
+        const buildEraSessionStats = SHARED.buildEraSessionStats || ((history) => {
+            const stats = {};
+            if (!Array.isArray(history)) return stats;
+            history.forEach((h) => {
+                const eraKey = String((h && h.summaryEra) || '').trim();
+                if (!eraKey) return;
+                if (!stats[eraKey]) stats[eraKey] = { count: 0, lastTs: 0 };
+                stats[eraKey].count += 1;
+                const ts = Number(h.timestamp) || 0;
+                if (ts > stats[eraKey].lastTs) stats[eraKey].lastTs = ts;
+            });
+            return stats;
+        });
+
+        let USER_NAME = "";
+        let USER_CLASS = ""; // ユーザーのクラス（菊/桜）
+        let USER_NUMBER = ""; // ユーザーの番号（1~40）
+        let USER_STATUS = ""; // ユーザーのステータスメッセージ
+        let masterDataTotal = [];
+        let quizData = []; let currentIdx = 0; let score = 0; let streak = 0;
+        let canAnswer = true; let chartInstance = null;
+        let chartScriptLoading = null;
+        let sessionAnswers = [];
+        let isRankingPublic = true; // ランキング公開設定（デフォルトは公開）
+        let isQuestionShuffleEnabled = false; // 問題シャッフル設定（デフォルトはOFF）
+        let isWeakPointsMode = false; // Weak Pointsモード（間違えた問題のみ表示）
+        let currentSessionEra = ""; let currentSessionRangeLabel = "";
+        let userHistory = [];
+        let questionStats = {};
+        let rankingData = [];
+        let selectedGoal = 80;
+
+        // ステータスメッセージのリスト（20個）
+        const STATUS_MESSAGES = [
+            "今日も頑張ろう！",
+            "一歩ずつ前進中",
+            "努力は裏切らない",
+            "集中して取り組もう",
+            "継続は力なり",
+            "自分を信じて",
+            "目標に向かって",
+            "毎日が成長の日",
+            "諦めない心",
+            "最高の自分を目指して",
+            "一緒に頑張ろう！",
+            "今日が自分にとって一番若い日",
+            "人事を尽くして天命を待つ",
+            "集中モード",
+            "スマホで遊ぶの禁止",
+            "切磋琢磨しよう",
+            "みんな頑張ってるね！",
+            "一番目指すよ！",
+            "みょーん",
+            "しまっちゃうおじさんにしまわれないようにがんばる！"
+        ];
+
+        const THEMES = {
+            modeA: { bg: '#0f172a', panel: 'rgba(30, 41, 59, 0.85)', accent: '#6366f1', text: '#f8fafc' },
+            modeB: { bg: '#064e3b', panel: 'rgba(6, 78, 59, 0.8)', accent: '#10b981', text: '#ecfdf5' },
+            modeC: { bg: '#450a0a', panel: 'rgba(127, 29, 29, 0.7)', accent: '#f43f5e', text: '#fff1f2' },
+            modeD: { bg: '#18181b', panel: 'rgba(39, 39, 42, 0.9)', accent: '#94a3b8', text: '#f4f4f5' },
+            modeE: { bg: '#431407', panel: 'rgba(124, 45, 18, 0.8)', accent: '#f59e0b', text: '#fff7ed' },
+            modeF: { bg: '#083344', panel: 'rgba(22, 78, 99, 0.8)', accent: '#00f2ff', text: '#ecfeff' },
+            modeG: { bg: '#2e1065', panel: 'rgba(76, 29, 149, 0.8)', accent: '#a855f7', text: '#f5f3ff' },
+            modeH: { bg: '#1e1b4b', panel: 'rgba(49, 46, 129, 0.8)', accent: '#fbbf24', text: '#fffbeb' },
+            modeI: { bg: '#000000', panel: 'rgba(17, 24, 39, 0.9)', accent: '#ec4899', text: '#fdf2f8' },
+            modeJ: { bg: '#022c22', panel: 'rgba(20, 83, 45, 0.8)', accent: '#4ade80', text: '#f0fdf4' },
+            t11: { bg: '#fdf2f8', panel: 'rgba(255, 255, 255, 0.9)', accent: '#db2777', text: '#831843' },
+            t12: { bg: '#f5f3ff', panel: 'rgba(255, 255, 255, 0.9)', accent: '#7c3aed', text: '#4c1d95' },
+            t13: { bg: '#ecfeff', panel: 'rgba(255, 255, 255, 0.9)', accent: '#0891b2', text: '#164e63' },
+            t14: { bg: '#fff7ed', panel: 'rgba(255, 255, 255, 0.9)', accent: '#ea580c', text: '#7c2d12' },
+            t15: { bg: '#f0f9ff', panel: 'rgba(255, 255, 255, 0.9)', accent: '#0284c7', text: '#0c4a6e' },
+            t16: { bg: '#020617', panel: 'rgba(15, 23, 42, 0.85)', accent: '#38bdf8', text: '#f8fafc' },
+            t17: { bg: '#111827', panel: 'rgba(31, 41, 55, 0.8)', accent: '#60a5fa', text: '#f3f4f6' },
+            t18: { bg: '#171717', panel: 'rgba(38, 38, 38, 0.85)', accent: '#a3a3a3', text: '#ffffff' },
+            t19: { bg: '#0c0a09', panel: 'rgba(28, 25, 23, 0.8)', accent: '#d6d3d1', text: '#fafaf9' },
+            t20: { bg: '#052e16', panel: 'rgba(6, 78, 59, 0.7)', accent: '#22c55e', text: '#f0fdf4' },
+            t21: { bg: '#2d1616', panel: 'rgba(69, 10, 10, 0.8)', accent: '#ef4444', text: '#fee2e2' },
+            t22: { bg: '#161d2d', panel: 'rgba(15, 23, 42, 0.8)', accent: '#3b82f6', text: '#eff6ff' },
+            t23: { bg: '#1d2d16', panel: 'rgba(20, 83, 45, 0.75)', accent: '#16a34a', text: '#f0fdf4' },
+            t24: { bg: '#2d2d16', panel: 'rgba(66, 66, 30, 0.8)', accent: '#ca8a04', text: '#fefce8' },
+            t25: { bg: '#22162d', panel: 'rgba(46, 16, 101, 0.8)', accent: '#9333ea', text: '#faf5ff' },
+            t26: { bg: '#000000', panel: 'rgba(20, 20, 20, 0.9)', accent: '#00ff41', text: '#ffffff' },
+            t27: { bg: '#0f0514', panel: 'rgba(30, 10, 40, 0.8)', accent: '#ff00ff', text: '#ffffff' },
+            t28: { bg: '#050f14', panel: 'rgba(10, 30, 40, 0.8)', accent: '#00ffff', text: '#ffffff' },
+            t29: { bg: '#140f05', panel: 'rgba(40, 30, 10, 0.8)', accent: '#ffff00', text: '#ffffff' },
+            t30: { bg: '#140505', panel: 'rgba(40, 10, 10, 0.8)', accent: '#ff0000', text: '#ffffff' },
+            t31: { bg: '#fff1f2', panel: 'rgba(255, 255, 255, 0.85)', accent: '#fb7185', text: '#881337' },
+            t32: { bg: '#f0fdf4', panel: 'rgba(255, 255, 255, 0.85)', accent: '#4ade80', text: '#064e3b' },
+            t33: { bg: '#fff7ed', panel: 'rgba(255, 255, 255, 0.85)', accent: '#f97316', text: '#7c2d12' },
+            t34: { bg: '#f8fafc', panel: 'rgba(255, 255, 255, 0.85)', accent: '#94a3b8', text: '#0f172a' },
+            t35: { bg: '#faf5ff', panel: 'rgba(255, 255, 255, 0.85)', accent: '#a855f7', text: '#3b0764' },
+            t36: { bg: '#1e293b', panel: 'rgba(51, 65, 85, 0.8)', accent: '#38bdf8', text: '#f1f5f9' },
+            t37: { bg: '#312e81', panel: 'rgba(67, 56, 202, 0.8)', accent: '#818cf8', text: '#e0e7ff' },
+            t38: { bg: '#4c1d95', panel: 'rgba(91, 33, 182, 0.8)', accent: '#c084fc', text: '#f5f3ff' },
+            t39: { bg: '#831843', panel: 'rgba(157, 23, 77, 0.8)', accent: '#f472b6', text: '#fdf2f8' },
+            t40: { bg: '#7c2d12', panel: 'rgba(154, 52, 18, 0.8)', accent: '#fb923c', text: '#fff7ed' },
+            t41: { bg: '#164e63', panel: 'rgba(21, 94, 117, 0.8)', accent: '#22d3ee', text: '#ecfeff' },
+            t42: { bg: '#065f46', panel: 'rgba(5, 150, 105, 0.8)', accent: '#34d399', text: '#ecfdf5' },
+            t43: { bg: '#3f6212', panel: 'rgba(101, 163, 13, 0.8)', accent: '#a3e635', text: '#f7fee7' },
+            t44: { bg: '#854d0e', panel: 'rgba(202, 138, 4, 0.8)', accent: '#facc15', text: '#fefce8' },
+            t45: { bg: '#92400e', panel: 'rgba(180, 83, 9, 0.8)', accent: '#fbbf24', text: '#fffbeb' },
+            t46: { bg: '#991b1b', panel: 'rgba(185, 28, 28, 0.8)', accent: '#f87171', text: '#fef2f2' },
+            t47: { bg: '#374151', panel: 'rgba(75, 85, 99, 0.8)', accent: '#9ca3af', text: '#f9fafb' },
+            t48: { bg: '#0f172a', panel: 'rgba(30, 41, 59, 0.8)', accent: '#f472b6', text: '#f8fafc' },
+            t49: { bg: '#1e1b4b', panel: 'rgba(49, 46, 129, 0.8)', accent: '#2dd4bf', text: '#f0fdfa' },
+            t50: { bg: '#111827', panel: 'rgba(31, 41, 55, 0.8)', accent: '#fcd34d', text: '#fffbeb' }
+        };
+
+        const getEl = (id) => document.getElementById(id);
+        const setOnClick = (id, fn) => { const el = getEl(id); if (el) el.onclick = fn; };
+
+        // KaTeX数式レンダリング関数（より確実な方法）
+        function renderMath(element, maxAttempts = 30) {
+            if (!element) return;
+            
+            let attempts = 0;
+            
+            // renderMathInElementが利用可能になるまで待つ
+            const doRender = () => {
+                attempts++;
+                
+                // renderMathInElementが利用可能かチェック
+                if (typeof renderMathInElement === 'undefined') {
+                    // まだ読み込まれていない場合は100ms後に再試行（最大maxAttempts回 = 3秒）
+                    if (attempts < maxAttempts) {
+                        setTimeout(doRender, 100);
+                    } else {
+                        console.warn('KaTeX renderMathInElement could not be loaded after', maxAttempts, 'attempts');
+                    }
+                    return;
+                }
+                
+                try {
+                    // 要素内のテキストを取得し、$...$で囲まれたLaTeX数式をレンダリング
+                    renderMathInElement(element, {
+                        delimiters: [
+                            {left: '$$', right: '$$', display: true},
+                            {left: '$', right: '$', display: false},
+                            {left: '\\[', right: '\\]', display: true},
+                            {left: '\\(', right: '\\)', display: false}
+                        ],
+                        throwOnError: false,
+                        errorColor: '#cc0000',
+                        strict: false
+                    });
+                } catch (e) {
+                    console.error('KaTeX rendering error:', e);
+                }
+            };
+            
+            // 即座に試行（既に読み込まれている場合）
+            doRender();
+        }
+
+        // テキストにLaTeX数式が含まれている場合、レンダリングされたHTMLを返す関数
+        function renderMathText(text) {
+            if (!text || !window.katex) return text;
+            try {
+                // $...$で囲まれたLaTeX数式をKaTeXでレンダリング
+                // インライン数式: $...$
+                return text.replace(/\$([^$]+)\$/g, (match, formula) => {
+                    try {
+                        return katex.renderToString(formula, { throwOnError: false, displayMode: false });
+                    } catch (e) {
+                        return match; // エラー時は元のテキストを返す
+                    }
+                });
+            } catch (e) {
+                console.error('Math rendering error:', e);
+                return text;
+            }
+        }
+
+        window.applyTheme = (modeId) => {
+            const t = THEMES[modeId]; if (!t) return;
+            const root = document.documentElement;
+            root.style.setProperty('--bg-deep', t.bg);
+            root.style.setProperty('--panel-bg', t.panel);
+            root.style.setProperty('--accent-primary', t.accent);
+            root.style.setProperty('--text-main', t.text);
+            Object.keys(THEMES).forEach(m => { const swatch = getEl(`swatch-${m}`); if (swatch) swatch.classList.remove('active'); });
+            const activeSwatch = getEl(`swatch-${modeId}`); if (activeSwatch) activeSwatch.classList.add('active');
+            localStorage.setItem('ethics_theme_mode', modeId);
+            if (chartInstance) renderPerformanceChart(userHistory);
+        };
+
+        window.setGoal = (pct) => {
+            selectedGoal = pct;
+            ['60','80','100'].forEach(g => { const btn = getEl(`goal-${g}`); if (btn) btn.classList.remove('active'); });
+            const activeBtn = getEl(`goal-${pct}`); if (activeBtn) activeBtn.classList.add('active');
+        };
+
+        window.closeModal = () => {
+            const modal = getEl('custom-modal');
+            if (modal) modal.classList.remove('active');
+        };
+
+        // 新版専用: 詳細な診断ログ付きfetch関数
+        async function fetchWithDetailedDiagnostics(url, options = {}) {
+            const diagnostic = {
+                requestUrl: url,
+                requestMethod: options.method || 'GET',
+                timestamp: new Date().toISOString()
+            };
+            
+            console.group('🔍 [新版] GAS同期診断');
+            console.log('📤 リクエストURL:', url);
+            console.log('📤 リクエストメソッド:', diagnostic.requestMethod);
+            console.log('📤 リクエストオプション:', options);
+            
+            try {
+                const res = await fetch(url, options);
+                
+                // レスポンスの基本情報を記録
+                diagnostic.responseStatus = res.status;
+                diagnostic.responseOk = res.ok;
+                diagnostic.responseStatusText = res.statusText;
+                diagnostic.responseUrl = res.url; // リダイレクト後のURL
+                diagnostic.responseHeaders = {};
+                res.headers.forEach((value, key) => {
+                    diagnostic.responseHeaders[key] = value;
+                });
+                
+                console.log('📥 レスポンスステータス:', res.status, res.statusText);
+                console.log('📥 レスポンスOK:', res.ok);
+                console.log('📥 レスポンスURL（リダイレクト後）:', res.url);
+                console.log('📥 レスポンスヘッダー:', diagnostic.responseHeaders);
+                console.log('📥 Content-Type:', res.headers.get('content-type'));
+                
+                // リダイレクトチェック
+                if (res.url !== url) {
+                    console.warn('⚠️ リダイレクト検出:', url, '→', res.url);
+                    // script.googleusercontent.comへのリダイレクトは正常（GAS WebAppの標準動作）
+                    // accounts.google.comへのリダイレクトのみをエラーとして扱う
+                    if (res.url.includes('accounts.google.com')) {
+                        console.error('❌ Google認証画面へのリダイレクト。GASのデプロイ設定を確認してください。');
+                        throw new Error('GASへのアクセスが認証にリダイレクトされました。デプロイ設定（アクセス権: 全員）を確認してください。');
+                    }
+                    // script.googleusercontent.comへのリダイレクトは正常（ステータス200、JSONが返る）
+                    if (res.url.includes('googleusercontent.com') && res.ok && res.status === 200) {
+                        console.log('✅ GAS WebAppへの正常なリダイレクト（これは正常な動作です）');
+                    }
+                }
+                
+                // HTTPステータスコード別の診断
+                if (res.status === 302 || res.status === 301 || res.status === 307 || res.status === 308) {
+                    console.error('❌ リダイレクトステータス:', res.status);
+                    throw new Error(`リダイレクトが発生しました: ${res.status} → ${res.url}`);
+                }
+                
+                if (res.status === 403) {
+                    console.error('❌ 403 Forbidden: アクセス権限がありません');
+                    throw new Error('403 Forbidden: GASのデプロイ設定で「アクセスできるユーザー: 全員」になっているか確認してください。');
+                }
+                
+                if (res.status === 404) {
+                    console.error('❌ 404 Not Found: GAS URLが間違っているか、デプロイが無効です');
+                    throw new Error('404 Not Found: GAS URLを確認してください。');
+                }
+                
+                if (res.status >= 500) {
+                    console.error('❌ サーバーエラー:', res.status);
+                    const errorText = await res.text().catch(() => '');
+                    console.error('❌ エラー本文:', errorText.substring(0, 500));
+                    throw new Error(`GASサーバーエラー ${res.status}: ${errorText.substring(0, 200)}`);
+                }
+                
+                if (!res.ok) {
+                    console.error('❌ HTTPエラー:', res.status, res.statusText);
+                    const errorText = await res.text().catch(() => '');
+                    console.error('❌ エラー本文:', errorText.substring(0, 500));
+                    throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+                }
+                
+                // Content-Typeチェック
+                const contentType = res.headers.get('content-type') || '';
+                console.log('📥 Content-Type:', contentType);
+                
+                if (!contentType.includes('application/json') && !contentType.includes('text/plain')) {
+                    console.warn('⚠️ Content-TypeがJSONではありません:', contentType);
+                    const textPreview = await res.text().catch(() => '');
+                    console.error('❌ レスポンス本文（先頭500文字）:', textPreview.substring(0, 500));
+                    
+                    // HTMLが返された場合（ログインページなど）
+                    if (textPreview.includes('<!DOCTYPE html>') || textPreview.includes('<html')) {
+                        throw new Error('HTMLが返されました。GASのデプロイ設定で「アクセスできるユーザー: 全員」になっているか確認してください。');
+                    }
+                    
+                    throw new Error(`予期しないContent-Type: ${contentType}`);
+                }
+                
+                // JSONパースを試行
+                let jsonData;
+                try {
+                    jsonData = await res.json();
+                    console.log('✅ JSONパース成功');
+                    console.log('📦 データ構造:', Object.keys(jsonData));
+                } catch (parseError) {
+                    const textData = await res.text().catch(() => '');
+                    console.error('❌ JSONパースエラー:', parseError);
+                    console.error('❌ レスポンス本文（先頭500文字）:', textData.substring(0, 500));
+                    throw new Error(`JSONパースエラー: ${parseError.message}. レスポンス: ${textData.substring(0, 200)}`);
+                }
+                
+                // エラーフィールドのチェック
+                if (jsonData.error) {
+                    console.error('❌ GAS側のエラー:', jsonData.error);
+                    throw new Error(`GASエラー: ${jsonData.error}`);
+                }
+                
+                diagnostic.success = true;
+                console.log('✅ 同期成功');
+                console.groupEnd();
+                return jsonData;
+                
+            } catch (err) {
+                diagnostic.error = err.message;
+                diagnostic.success = false;
+                console.error('❌ 同期エラー:', err);
+                console.error('❌ エラースタック:', err.stack);
+                console.groupEnd();
+                throw err;
+            }
+        }
+
+        // 後方互換性のため、既存のfetchWithRetryも保持
+        async function fetchWithRetry(url, options = {}, retries = 5, backoff = 1000) {
+            try {
+                return await fetchWithDetailedDiagnostics(url, options);
+            } catch (err) {
+                if (retries > 0) {
+                    console.log(`🔄 リトライ (残り${retries}回) - ${backoff}ms後に再試行`);
+                    await new Promise(r => setTimeout(r, backoff));
+                    return fetchWithRetry(url, options, retries - 1, backoff * 2);
+                }
+                throw err;
+            }
+        }
+        
+        function formatAccStr(val) {
+            if (val === null || val === undefined || val === "" || val === "--%") return "--%";
+            let s = String(val).replace('%', '').trim();
+            let n = parseFloat(s);
+            if (isNaN(n)) return "--%";
+            if (n <= 1.0 && n > 0 && String(val).indexOf('%') === -1) n *= 100;
+            return Math.round(n) + "%";
+        }
+
+        function isSystemOrConfigSheetName(name) {
+            const normalized = String(name || '').replace(/\u3000/g, ' ').trim();
+            if (!normalized) return true;
+            const exactNames = new Set(['履歴ログ', '詳細履歴ログ', '問題別統計DB', '成績一覧', 'メンバー一覧', '設定']);
+            if (exactNames.has(normalized)) return true;
+            const lower = normalized.toLowerCase();
+            return ['config', 'settings', '_config', '_settings'].includes(lower);
+        }
+
+        function initUserInfo() { 
+            USER_NAME = normalizeUserName(localStorage.getItem('ethics_user_name') || '');
+            USER_CLASS = localStorage.getItem('ethics_user_class') || '';
+            USER_NUMBER = localStorage.getItem('ethics_user_number') || '';
+            // ローカルストレージからstatusメッセージを読み込む
+            USER_STATUS = localStorage.getItem('ethics_user_status') || '';
+            // ローカルストレージに値がない場合はデフォルトで公開（true）
+            const storedPublic = localStorage.getItem('ethics_ranking_public');
+            isRankingPublic = storedPublic === null ? true : storedPublic === 'true';
+            // ローカルストレージから問題シャッフル設定を読み込む（デフォルトはOFF）
+            const storedShuffle = localStorage.getItem('ethics_question_shuffle');
+            isQuestionShuffleEnabled = storedShuffle === 'true';
+            // ローカルストレージからWeak Pointsモード設定を読み込む（デフォルトはOFF）
+            const storedWeakPoints = localStorage.getItem('ethics_weak_points_mode');
+            isWeakPointsMode = storedWeakPoints === 'true';
+            if (!USER_NAME) { 
+                getEl('registration-modal').classList.add('active'); 
+            } else { 
+                updateUserDisplay(); 
+                updateStatusDisplay();
+                updateShuffleDisplay();
+            } 
+        }
+        function updateUserDisplay() { 
+            const displayEl = getEl('active-user-display');
+            if (displayEl) {
+                // 名前の横に公開/非公開を小さく英語で表示
+                const publicLabel = isRankingPublic ? 'PUBLIC' : 'PRIVATE';
+                const labelSpan = document.createElement('span');
+                labelSpan.className = isRankingPublic ? 'text-[7px] text-amber-400/70 font-normal ml-1' : 'text-[7px] text-slate-300/80 font-normal ml-1';
+                labelSpan.textContent = publicLabel;
+                const nameText = USER_NAME ? USER_NAME : '未登録';
+                const labelText = USER_CLASS && USER_NUMBER ? `${USER_CLASS}-${USER_NUMBER} ` : '';
+                displayEl.textContent = `${labelText}${nameText}`;
+                displayEl.appendChild(labelSpan);
+                // 公開設定に応じてスタイルを変更（光らせる=公開）
+                if (isRankingPublic) {
+                    displayEl.classList.add('bg-amber-500/30', 'border-amber-400/50', 'text-amber-200', 'shadow-lg', 'shadow-amber-500/50');
+                    displayEl.classList.remove('bg-white/10', 'border-white/20', 'text-white');
+                } else {
+                    displayEl.classList.add('bg-white/10', 'border-white/20', 'text-white');
+                    displayEl.classList.remove('bg-amber-500/30', 'border-amber-400/50', 'text-amber-200', 'shadow-lg', 'shadow-amber-500/50');
+                }
+            }
+        }
+        function updateStatusDisplay() {
+            const statusEl = getEl('user-status-display');
+            if (statusEl) {
+                if (USER_STATUS) {
+                    statusEl.innerText = USER_STATUS;
+                    statusEl.classList.add('bg-indigo-500/30', 'border-indigo-400/50', 'text-indigo-200', 'shadow-lg', 'shadow-indigo-500/50');
+                    statusEl.classList.remove('bg-white/10', 'border-white/20', 'text-white');
+                } else {
+                    statusEl.innerText = 'status';
+                    statusEl.classList.add('bg-white/10', 'border-white/20', 'text-white');
+                    statusEl.classList.remove('bg-indigo-500/30', 'border-indigo-400/50', 'text-indigo-200', 'shadow-lg', 'shadow-indigo-500/50');
+                }
+            }
+        }
+        window.openStatusModal = () => {
+            const modal = getEl('status-modal');
+            if (modal) {
+                modal.classList.remove('hidden');
+                const grid = getEl('status-messages-grid');
+                const customInputArea = getEl('status-custom-input-area');
+                if (grid) {
+                    grid.innerHTML = '';
+                    // 20個のメッセージボタン
+                    STATUS_MESSAGES.forEach((msg, idx) => {
+                        const btn = document.createElement('button');
+                        btn.className = 'bg-white/5 hover:bg-white/10 text-white text-sm p-3 rounded-xl border border-white/10 text-left transition-all';
+                        btn.innerText = msg;
+                        btn.onclick = () => {
+                            USER_STATUS = msg;
+                            localStorage.setItem('ethics_user_status', USER_STATUS);
+                            updateStatusDisplay();
+                            window.closeStatusModal();
+                            // スプレッドシートにも保存
+                            window.saveStatusToSpreadsheet();
+                        };
+                        grid.appendChild(btn);
+                    });
+                    // 21個目：空白（カスタム入力）
+                    const customBtn = document.createElement('button');
+                    customBtn.className = 'bg-white/5 hover:bg-white/10 text-white text-sm p-3 rounded-xl border-2 border-dashed border-indigo-500/50 text-left transition-all italic';
+                    customBtn.innerHTML = '<span class="opacity-50">　</span>';
+                    customBtn.onclick = () => {
+                        if (customInputArea) {
+                            customInputArea.classList.remove('hidden');
+                            const input = getEl('status-custom-input');
+                            if (input) {
+                                input.value = '';
+                                input.focus();
+                            }
+                        }
+                    };
+                    grid.appendChild(customBtn);
+                }
+                // カスタム入力エリアを非表示に
+                if (customInputArea) {
+                    customInputArea.classList.add('hidden');
+                }
+            }
+        };
+        
+        // カスタムステータスの保存
+        window.saveCustomStatus = () => {
+            const input = getEl('status-custom-input');
+            if (input && input.value.trim()) {
+                USER_STATUS = input.value.trim();
+                localStorage.setItem('ethics_user_status', USER_STATUS);
+                updateStatusDisplay();
+                window.closeStatusModal();
+                window.saveStatusToSpreadsheet();
+            }
+        };
+        
+        // カスタム入力のキャンセル
+        window.cancelCustomStatus = () => {
+            const customInputArea = getEl('status-custom-input-area');
+            const input = getEl('status-custom-input');
+            if (customInputArea) customInputArea.classList.add('hidden');
+            if (input) input.value = '';
+        };
+        window.closeStatusModal = () => {
+            const modal = getEl('status-modal');
+            const customInputArea = getEl('status-custom-input-area');
+            const input = getEl('status-custom-input');
+            if (modal) modal.classList.add('hidden');
+            // カスタム入力エリアも非表示にしてリセット
+            if (customInputArea) customInputArea.classList.add('hidden');
+            if (input) input.value = '';
+        };
+        function toggleRankingPublic() {
+            isRankingPublic = !isRankingPublic;
+            localStorage.setItem('ethics_ranking_public', isRankingPublic.toString());
+            updateUserDisplay();
+        }
+        function updateShuffleDisplay() {
+            const displayEl = getEl('question-shuffle-display');
+            if (displayEl) {
+                // 状態を小さく英語で表示
+                const shuffleLabel = isQuestionShuffleEnabled ? '<span class="text-[7px] text-emerald-400/70 font-normal ml-1">ON</span>' : '<span class="text-[7px] text-slate-300/80 font-normal ml-1">OFF</span>';
+                displayEl.innerHTML = 'SHUFFLE' + shuffleLabel;
+                // シャッフル設定に応じてスタイルを変更（光らせる=ON）
+                if (isQuestionShuffleEnabled) {
+                    displayEl.classList.add('bg-emerald-500/30', 'border-emerald-400/50', 'text-emerald-200', 'shadow-lg', 'shadow-emerald-500/50');
+                    displayEl.classList.remove('bg-white/10', 'border-white/20', 'text-white');
+                } else {
+                    displayEl.classList.add('bg-white/10', 'border-white/20', 'text-white');
+                    displayEl.classList.remove('bg-emerald-500/30', 'border-emerald-400/50', 'text-emerald-200', 'shadow-lg', 'shadow-emerald-500/50');
+                }
+            }
+        }
+        function toggleQuestionShuffle() {
+            isQuestionShuffleEnabled = !isQuestionShuffleEnabled;
+            localStorage.setItem('ethics_question_shuffle', isQuestionShuffleEnabled.toString());
+            updateShuffleDisplay();
+        }
+        
+        window.toggleWeakList = () => {
+            isWeakPointsMode = !isWeakPointsMode;
+            localStorage.setItem('ethics_weak_points_mode', isWeakPointsMode.toString());
+            // メニューを再描画してWeak Pointsモードを反映
+            window.renderEraMenu();
+            // ボタンのスタイルを更新
+            const weakBtn = document.querySelector('button[onclick="window.toggleWeakList()"]');
+            if (weakBtn) {
+                if (isWeakPointsMode) {
+                    weakBtn.classList.add('bg-rose-600/40', 'border-rose-400/60', 'text-rose-200', 'shadow-lg', 'shadow-rose-500/50');
+                    weakBtn.classList.remove('bg-rose-500/20', 'border-rose-500/30', 'text-rose-300');
+                } else {
+                    weakBtn.classList.add('bg-rose-500/20', 'border-rose-500/30', 'text-rose-300');
+                    weakBtn.classList.remove('bg-rose-600/40', 'border-rose-400/60', 'text-rose-200', 'shadow-lg', 'shadow-rose-500/50');
+                }
+            }
+        };
+        
+        window.logoutUser = async () => {
+            if (!confirm('ログアウトしますか？')) return;
+            USER_NAME = '';
+            USER_CLASS = '';
+            USER_NUMBER = '';
+            USER_STATUS = '';
+            isRankingPublic = true;
+            userHistory = [];
+            questionStats = {};
+            localStorage.removeItem('ethics_user_name');
+            localStorage.removeItem('ethics_user_class');
+            localStorage.removeItem('ethics_user_number');
+            localStorage.removeItem('ethics_user_status');
+            localStorage.removeItem('ethics_ranking_public');
+            updateUserDisplay();
+            updateStatusDisplay();
+            updateShuffleDisplay();
+            getEl('registration-modal').classList.add('active');
+            await window.syncAllFromSpreadsheet(true);
+        };
+
+        setOnClick('register-btn', () => {
+            const nameVal = normalizeUserName(getEl('user-name-input').value.trim());
+            const classVal = getEl('user-class-select').value;
+            const numberVal = getEl('user-number-input').value.trim();
+            
+            // バリデーション
+            if (!nameVal) {
+                showModal("登録エラー", "名前を入力してください。");
+                return;
+            }
+            if (!classVal) {
+                showModal("登録エラー", "クラスを選択してください。");
+                return;
+            }
+            if (!numberVal) {
+                showModal("登録エラー", "番号を入力してください。");
+                return;
+            }
+            const numberNum = parseInt(numberVal);
+            if (isNaN(numberNum) || numberNum < 1 || numberNum > 40) {
+                showModal("登録エラー", "番号は1~40の半角数字で入力してください。");
+                return;
+            }
+            
+            // 半角数字チェック
+            if (!/^[0-9]+$/.test(numberVal)) {
+                showModal("登録エラー", "番号は半角数字のみ入力可能です。");
+                return;
+            }
+            
+            USER_NAME = nameVal;
+            USER_CLASS = classVal;
+            USER_NUMBER = numberVal;
+            
+            localStorage.setItem('ethics_user_name', USER_NAME);
+            localStorage.setItem('ethics_user_class', USER_CLASS);
+            localStorage.setItem('ethics_user_number', USER_NUMBER);
+            
+            getEl('registration-modal').classList.remove('active');
+            updateUserDisplay();
+            updateStatusDisplay();
+            updateShuffleDisplay();
+            window.syncAllFromSpreadsheet(true);
+        });
+        setOnClick('active-user-display', toggleRankingPublic);
+        setOnClick('logout-btn', window.logoutUser);
+        setOnClick('user-status-display', window.openStatusModal);
+        setOnClick('question-shuffle-display', toggleQuestionShuffle);
+        setOnClick('status-custom-save-btn', window.saveCustomStatus);
+        setOnClick('status-custom-cancel-btn', window.cancelCustomStatus);
+        
+        // カスタム入力でEnterキーを押したときに保存
+        const customInput = getEl('status-custom-input');
+        if (customInput) {
+            customInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    window.saveCustomStatus();
+                }
+            });
+        }
+
+        async function logDetailedResultsToSpreadsheet(pct, correct, total) {
+            if (!FIXED_GAS_URL) return null;
+            // 入力フィールドからURLを取得
+            const urlInput = getEl('main-spreadsheet-url');
+            const spreadsheetUrl = urlInput && urlInput.value ? urlInput.value : FIXED_SPREADSHEET_URL;
+            const sid = spreadsheetUrl.match(/\/d\/([a-zA-Z0-9-_]+)/)?.[1];
+            if (!sid) return null;
+            
+            // ユーザーIDの生成（クラス-番号-名前形式）
+            const userId = `${USER_CLASS}-${USER_NUMBER}-${USER_NAME}`;
+            
+            const payload = { 
+                action: 'logAll', 
+                spreadsheetId: sid, 
+                dbName: USER_NAME, 
+                userId: userId,
+                userClass: USER_CLASS,
+                userNumber: USER_NUMBER,
+                summaryAccuracy: pct + '%', 
+                summaryScore: `${correct}/${total}`, 
+                summaryRange: currentSessionRangeLabel, 
+                summaryEra: currentSessionEra, 
+                details: JSON.stringify(quizData.map((q, idx) => ({ era: q.era, qIdx: q.id.split('-').pop(), attemptNum: (questionStats[q.id]?.total || 1), result: sessionAnswers[idx] ? "○" : "×" }))), 
+                gainedExp: correct, 
+                finalStreak: streak, 
+                isPublic: isRankingPublic ? '1' : '0', 
+                status: USER_STATUS || '' 
+            };
+            try {
+                const result = await fetchWithRetry(`${FIXED_GAS_URL}?${new URLSearchParams(payload).toString()}`);
+                window.syncAllFromSpreadsheet(true);
+                return result;
+            } catch (e) {
+                return null;
+            }
+        }
+
+        function updateStatsUI() {
+            try {
+                const sorted = [...userHistory].sort((a,b) => b.timestamp - a.timestamp);
+                const latest = sorted[0];
+                if (latest) {
+                    const totalExp = latest.totalExp || 0;
+                    const expEl = getEl('total-neural-exp');
+                    if (expEl) {
+                        expEl.innerText = totalExp;
+                        // レベルアップ判定と点滅処理
+                        const lv = Math.floor(totalExp / 10);
+                        const nextLevelExp = (lv + 1) * 10;
+                        const remainingExp = nextLevelExp - totalExp;
+                        const isLevelUpJustNow = (totalExp % 10 === 0 && totalExp > 0);
+                        const isNearLevelUp = remainingExp <= 5 && remainingExp > 0;
+                        
+                        // クラスをリセット
+                        expEl.classList.remove('level-up-blink', 'near-level-up-blink');
+                        
+                        if (isLevelUpJustNow) {
+                            // レベルアップ直後：金色で点滅
+                            expEl.classList.add('level-up-blink');
+                        } else if (isNearLevelUp) {
+                            // レベルアップが近い：紫/ピンクで点滅
+                            expEl.classList.add('near-level-up-blink');
+                        }
+                    }
+                    if (getEl('recent-accuracy')) getEl('recent-accuracy').innerText = formatAccStr(latest.avg10);
+                    if (getEl('best-accuracy')) getEl('best-accuracy').innerText = formatAccStr(latest.overallAcc);
+                    if (getEl('total-sessions-count')) getEl('total-sessions-count').innerText = userHistory.length;
+                    const lv = Math.floor(totalExp / 10);
+                    if (getEl('neural-level-display')) getEl('neural-level-display').innerText = `LV. ${String(lv).padStart(2, '0')}`;
+                } else {
+                    // 履歴がない場合の初期値
+                    if (getEl('total-neural-exp')) getEl('total-neural-exp').innerText = '0';
+                    if (getEl('recent-accuracy')) getEl('recent-accuracy').innerText = '--%';
+                    if (getEl('best-accuracy')) getEl('best-accuracy').innerText = '--%';
+                    if (getEl('total-sessions-count')) getEl('total-sessions-count').innerText = '0';
+                    if (getEl('neural-level-display')) getEl('neural-level-display').innerText = 'LV. 00';
+                }
+                
+                // 連続正解数を表示（GASスクリプトから取得した値を使用）
+                const currentStreak = window.currentStreak || 0;
+                const maxStreak = window.maxStreak || 0;
+                
+                if (getEl('current-streak-display')) getEl('current-streak-display').innerText = currentStreak;
+                if (getEl('max-streak-display')) getEl('max-streak-display').innerText = maxStreak;
+                
+                // ランキングデータがある場合のみランクを表示（分母も含める）
+                if (rankingData && rankingData.length > 0) {
+                    const myRank = rankingData.findIndex(r => (r.name || r.dbName) === USER_NAME) + 1;
+                    const totalRanking = rankingData.length;
+                    const myData = rankingData.find(r => (r.name || r.dbName) === USER_NAME);
+                    
+                    if (getEl('current-rank-display')) {
+                        const rankEl = getEl('current-rank-display');
+                        // ランクに応じてスタイルを変更（トップ10まで強調、上位50%以上も目立たせる）
+                        rankEl.className = 'text-[10px] px-4 py-1 rounded-full border font-black italic';
+                        const isTop50Percent = myRank > 0 && myRank <= Math.ceil(totalRanking / 2);
+                        
+                        if (myRank > 0 && myRank <= 10) {
+                            // トップ10までは順位に応じた強調
+                            if (myRank === 1) {
+                                rankEl.className += ' bg-gradient-to-r from-yellow-500/40 to-amber-500/40 border-yellow-400/60 text-yellow-200 shadow-lg shadow-yellow-500/50';
+                            } else if (myRank === 2) {
+                                rankEl.className += ' bg-gradient-to-r from-slate-400/40 to-slate-500/40 border-slate-300/60 text-slate-100 shadow-lg shadow-slate-400/50';
+                            } else if (myRank === 3) {
+                                rankEl.className += ' bg-gradient-to-r from-amber-600/40 to-orange-600/40 border-amber-500/60 text-amber-200 shadow-lg shadow-amber-600/50';
+                            } else if (myRank <= 5) {
+                                rankEl.className += ' bg-gradient-to-r from-purple-500/30 to-indigo-500/30 border-purple-400/50 text-purple-200 shadow-md shadow-purple-500/40';
+                            } else if (myRank <= 10) {
+                                rankEl.className += ' bg-gradient-to-r from-blue-500/25 to-cyan-500/25 border-blue-400/40 text-blue-200 shadow shadow-blue-500/30';
+                            }
+                        } else if (isTop50Percent) {
+                            // 10位より下位で上位50%以上は目立たせる（3位ほどではないが）
+                            rankEl.className += ' bg-gradient-to-r from-green-500/20 to-emerald-500/20 border-green-400/30 text-green-200';
+                        } else {
+                            rankEl.className += ' bg-white/10 border-white/20 text-white';
+                        }
+                        // ランク表示は日付を含めない
+                        rankEl.innerText = myRank > 0 ? `RANK ${myRank} / ${totalRanking}` : `RANK -- / ${totalRanking}`;
+                    }
+                    
+                    // 最終取り組み日時を表示（ランク表示の右側に別要素として）
+                    if (getEl('last-attempt-display')) {
+                        const lastEl = getEl('last-attempt-display');
+                        let lastDate = null;
+                        let lastDateStr = '';
+                        
+                        if (myData && myData.lastAttemptDate) {
+                            lastDateStr = myData.lastAttemptDate;
+                            // "yyyy/MM/dd HH:mm:ss"形式から日付オブジェクトを作成
+                            const dateTimeParts = lastDateStr.split(' ');
+                            if (dateTimeParts.length >= 1) {
+                                const dateParts = dateTimeParts[0].split('/');
+                                if (dateParts.length >= 3) {
+                                    lastDate = new Date(parseInt(dateParts[0]), parseInt(dateParts[1]) - 1, parseInt(dateParts[2]));
+                                    if (dateTimeParts.length >= 2) {
+                                        const timeParts = dateTimeParts[1].split(':');
+                                        if (timeParts.length >= 3) {
+                                            lastDate.setHours(parseInt(timeParts[0]), parseInt(timeParts[1]), parseInt(timeParts[2]));
+                                        }
+                                    }
+                                }
+                            }
+                        } else {
+                            // 履歴ログから最新の日時を取得
+                            const sortedHistory = [...userHistory].sort((a, b) => b.timestamp - a.timestamp);
+                            if (sortedHistory.length > 0 && sortedHistory[0].timestamp) {
+                                lastDate = new Date(sortedHistory[0].timestamp);
+                                const year = lastDate.getFullYear();
+                                const month = String(lastDate.getMonth() + 1).padStart(2, '0');
+                                const day = String(lastDate.getDate()).padStart(2, '0');
+                                const hours = String(lastDate.getHours()).padStart(2, '0');
+                                const minutes = String(lastDate.getMinutes()).padStart(2, '0');
+                                const seconds = String(lastDate.getSeconds()).padStart(2, '0');
+                                lastDateStr = `${year}/${month}/${day} ${hours}:${minutes}:${seconds}`;
+                            }
+                        }
+                        
+                        if (lastDate) {
+                            const now = new Date();
+                            const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                            const lastDay = new Date(lastDate.getFullYear(), lastDate.getMonth(), lastDate.getDate());
+                            const diffTime = today - lastDay;
+                            const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+                            
+                            let daysAgoText = '';
+                            if (diffDays === 0) {
+                                daysAgoText = 'Today';
+                            } else if (diffDays === 1) {
+                                daysAgoText = '1 day ago';
+                            } else {
+                                daysAgoText = `${diffDays} days ago`;
+                            }
+                            
+                            if (!lastDateStr) {
+                                const year = lastDate.getFullYear();
+                                const month = String(lastDate.getMonth() + 1).padStart(2, '0');
+                                const day = String(lastDate.getDate()).padStart(2, '0');
+                                const hours = String(lastDate.getHours()).padStart(2, '0');
+                                const minutes = String(lastDate.getMinutes()).padStart(2, '0');
+                                const seconds = String(lastDate.getSeconds()).padStart(2, '0');
+                                lastDateStr = `${year}/${month}/${day} ${hours}:${minutes}:${seconds}`;
+                            }
+                            
+                            // 連続日数を計算（ここで計算してLast表示の右に表示）
+                            let consecutiveDays = 0;
+                            const dailyStatsForStreak = {};
+                            userHistory.forEach(h => {
+                                if (h.timestamp) {
+                                    const date = new Date(h.timestamp);
+                                    const dateKey = `${date.getFullYear()}/${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getDate()).padStart(2, '0')}`;
+                                    dailyStatsForStreak[dateKey] = true;
+                                }
+                            });
+                            const sortedDatesForStreak = Object.keys(dailyStatsForStreak).sort((a, b) => new Date(b) - new Date(a));
+                            const todayForStreak = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                            let checkDateForStreak = new Date(todayForStreak);
+                            
+                            for (const dateStr of sortedDatesForStreak) {
+                                const date = new Date(dateStr);
+                                const dateOnly = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+                                const diffTime = checkDateForStreak - dateOnly;
+                                const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+                                
+                                if (diffDays === 0 || diffDays === 1) {
+                                    consecutiveDays++;
+                                    checkDateForStreak = new Date(dateOnly);
+                                } else {
+                                    break;
+                                }
+                            }
+                            
+                            lastEl.innerHTML = `Last: ${lastDateStr} <span class="text-cyan-300 font-bold">(${daysAgoText})</span> <span class="text-cyan-400 font-bold ml-2">${consecutiveDays} days streak</span>`;
+                            lastEl.style.display = '';
+                        } else {
+                            lastEl.style.display = 'none';
+                        }
+                    }
+                    
+                } else {
+                    if (getEl('current-rank-display')) {
+                        getEl('current-rank-display').innerText = 'RANK --';
+                        getEl('current-rank-display').className = 'bg-white/10 text-white text-[10px] px-4 py-1 rounded-full border border-white/20 font-black italic';
+                    }
+                    if (getEl('last-attempt-display')) {
+                        getEl('last-attempt-display').style.display = 'none';
+                    }
+                }
+
+                const rankCont = getEl('ranking-container');
+                const rankWrapper = getEl('ranking-card-wrapper');
+                const rankHeader = getEl('ranking-header');
+                
+                if (rankCont) { 
+                    // ランキングテーブルは常に表示（データがない場合でも）
+                    if (rankWrapper) rankWrapper.style.display = '';
+                    if (rankHeader) rankHeader.style.display = 'grid';
+                    
+                    if (rankingData && rankingData.length > 0) {
+                        console.log('ランキング表示開始:', rankingData.length, '件');
+                        
+                        // 最大の名前の幅を計算するための一時的な要素を作成
+                        const tempSpan = document.createElement('span');
+                        tempSpan.className = 'font-bold text-white whitespace-nowrap';
+                        tempSpan.style.visibility = 'hidden';
+                        tempSpan.style.position = 'absolute';
+                        tempSpan.style.whiteSpace = 'nowrap';
+                        document.body.appendChild(tempSpan);
+                        
+                        let maxNameWidth = 0;
+                        rankingData.forEach((r) => {
+                            const userNameDisplay = r.name || r.dbName || r.userName || r.user_name || '--';
+                            tempSpan.textContent = String(userNameDisplay);
+                            const width = tempSpan.offsetWidth;
+                            if (width > maxNameWidth) {
+                                maxNameWidth = width;
+                            }
+                        });
+                        
+                        // 最小幅を確保（"NAME"ラベルの幅も考慮）
+                        tempSpan.textContent = 'NAME';
+                        const labelWidth = tempSpan.offsetWidth;
+                        if (labelWidth > maxNameWidth) {
+                            maxNameWidth = labelWidth;
+                        }
+                        
+                        // パディングとマージンを考慮して少し余裕を持たせる
+                        maxNameWidth += 20;
+                        
+                        // 最大のstatusメッセージの幅を計算（1行表示用）
+                        let maxStatusWidth = 0;
+                        tempSpan.className = 'font-bold text-indigo-300';
+                        tempSpan.style.whiteSpace = 'nowrap';
+                        tempSpan.style.width = 'auto';
+                        
+                        rankingData.forEach((r) => {
+                            const statusDisplay = (r.status || (r.name === USER_NAME ? USER_STATUS : '')) || '--';
+                            tempSpan.textContent = String(statusDisplay);
+                            const width = tempSpan.offsetWidth;
+                            if (width > maxStatusWidth) {
+                                maxStatusWidth = width;
+                            }
+                        });
+                        
+                        // 最小幅を確保（"STATUS"ラベルの幅も考慮）
+                        tempSpan.textContent = 'STATUS';
+                        const statusLabelWidth = tempSpan.offsetWidth;
+                        if (statusLabelWidth > maxStatusWidth) {
+                            maxStatusWidth = statusLabelWidth;
+                        }
+                        
+                        // パディングとマージンを考慮して少し余裕を持たせる
+                        maxStatusWidth += 20;
+                        // 最小幅を確保（短いメッセージでも見やすく）
+                        if (maxStatusWidth < 150) {
+                            maxStatusWidth = 150;
+                        }
+                        // 最大幅を制限（長すぎる場合は横スクロールで対応）
+                        if (maxStatusWidth > 300) {
+                            maxStatusWidth = 300;
+                        }
+                        
+                        document.body.removeChild(tempSpan);
+                        
+                        console.log('最大の名前の幅:', maxNameWidth, 'px');
+                        console.log('最大のstatusの幅:', maxStatusWidth, 'px');
+                        
+                        rankCont.innerHTML = rankingData.map((r, i) => {
+                            console.log(`ランキングエントリ ${i}:`, r);
+                            const rLv = Math.floor((r.exp || 0) / 10);
+                            // 名前の取得を複数のプロパティから試行
+                            const userNameDisplay = r.name || r.dbName || r.userName || r.user_name || '--';
+                            console.log(`エントリ ${i} の名前:`, userNameDisplay, '元データ:', {name: r.name, dbName: r.dbName, userName: r.userName, user_name: r.user_name});
+                            const isMe = userNameDisplay === USER_NAME;
+                            // 最終取り組み日（userHistoryから取得、年月日のみ、時刻はカット）
+                            let lastDateDisplay = '--';
+                            // 自分の場合はuserHistoryから取得（フロントページと同じロジック）
+                            if (isMe && userHistory && userHistory.length > 0) {
+                                const sortedUserHistory = [...userHistory].sort((a, b) => b.timestamp - a.timestamp);
+                                const latestEntry = sortedUserHistory[0];
+                                if (latestEntry && latestEntry.timestamp) {
+                                    const date = new Date(latestEntry.timestamp);
+                                    const year = date.getFullYear();
+                                    const month = String(date.getMonth() + 1).padStart(2, '0');
+                                    const day = String(date.getDate()).padStart(2, '0');
+                                    lastDateDisplay = `${year}/${month}/${day}`;
+                                }
+                            }
+                            // rankingDataからも試す（フォールバック）
+                            if (lastDateDisplay === '--' && r.lastAttemptDate) {
+                                const dateTimeStr = String(r.lastAttemptDate);
+                                const dateTimeParts = dateTimeStr.split(' ');
+                                if (dateTimeParts.length >= 1) {
+                                    lastDateDisplay = dateTimeParts[0]; // 日付部分のみ（時刻はカット）
+                                }
+                            }
+                            const statusDisplay = (r.status || (isMe ? USER_STATUS : '')) || '--';
+                            // 名前を直接取得（確実に表示されるように）
+                            const finalUserName = r.name || r.dbName || userNameDisplay || 'Unknown';
+                            console.log(`最終的な名前表示: "${finalUserName}"`);
+                            
+                            const rowHtml = `<div class="grid gap-3 items-center text-[10px] py-1.5 border-b border-white/5 last:border-0 ${isMe ? 'text-amber-300 bg-white/5 font-bold' : 'text-slate-200'}" style="grid-template-columns: 30px ${maxNameWidth}px 50px 35px 70px 70px 40px 50px 50px 140px ${maxStatusWidth}px;">
+                                <span class="opacity-40 font-black text-center">${i+1}</span>
+                                <span class="font-bold text-white whitespace-nowrap" style="min-width: 0;">${String(finalUserName)}</span>
+                                <span class="text-left font-flashy text-[9px] text-indigo-400">${r.exp || 0}</span>
+                                <span class="text-left font-flashy text-[9px] text-emerald-400">${String(rLv).padStart(2,'0')}</span>
+                                <span class="text-left font-flashy text-[9px] text-orange-400">${r.avg10 || '--%'}</span>
+                                <span class="text-left font-flashy text-[9px] text-cyan-400">${r.overall || '--%'}</span>
+                                <span class="text-left font-flashy opacity-60 text-[9px]">${r.count || 0}</span>
+                                <span class="text-left font-flashy text-[9px] text-amber-400">${(r.currentStreak !== undefined && r.currentStreak !== null) ? r.currentStreak : '--'}</span>
+                                <span class="text-left font-flashy text-[9px] text-cyan-400">${(r.maxStreak !== undefined && r.maxStreak !== null) ? r.maxStreak : '--'}</span>
+                                <span class="text-left font-flashy text-[9px] text-slate-200 opacity-90">${lastDateDisplay}</span>
+                                <span class="text-left font-bold text-[10px] text-indigo-300 ranking-status-cell" style="min-width: ${maxStatusWidth}px; max-width: ${maxStatusWidth}px;" title="${statusDisplay}">${statusDisplay}</span>
+                            </div>`;
+                            console.log(`生成されたHTML (${i}行目):`, rowHtml);
+                            return rowHtml;
+                        }).join('');
+                        
+                        // ヘッダーの列幅も同じ値に設定
+                        const headerEl = getEl('ranking-header');
+                        if (headerEl) {
+                            headerEl.style.gridTemplateColumns = `30px ${maxNameWidth}px 50px 35px 70px 70px 40px 50px 50px 140px ${maxStatusWidth}px`;
+                        }
+                        
+                        console.log('最終的なHTML:', rankCont.innerHTML.substring(0, 500));
+                    } else {
+                        // データがない場合のメッセージ
+                        rankCont.innerHTML = '<div class="text-center text-[9px] text-slate-500/70 py-4 italic">No ranking data available</div>';
+                    }
+                    
+                    // 日付ごとの問題数と正答率を計算・表示（別の枠内で一番下に配置）
+                    const dailyStatsEl = getEl('daily-stats-container');
+                    if (dailyStatsEl) {
+                        if (userHistory && userHistory.length > 0) {
+                            // 日付ごとに問題数と正解数を集計
+                            const dailyStats = {};
+                            userHistory.forEach(h => {
+                                if (h.timestamp) {
+                                    const date = new Date(h.timestamp);
+                                    const dateKey = `${date.getFullYear()}/${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getDate()).padStart(2, '0')}`;
+                                    if (!dailyStats[dateKey]) {
+                                        dailyStats[dateKey] = { count: 0, totalQ: 0, correctQ: 0, gainedExp: 0 };
+                                    }
+                                    dailyStats[dateKey].count += 1;
+                                    dailyStats[dateKey].totalQ += (h.totalQ || 10);
+                                    dailyStats[dateKey].correctQ += (h.correctCount || 0);
+                                    // 獲得EXPは正解数と同じ（gainedExp: correct）
+                                    dailyStats[dateKey].gainedExp += (h.correctCount || 0);
+                                }
+                            });
+                            
+                            // 日付順にソート（新しい順）
+                            const sortedDailyStats = Object.entries(dailyStats).sort((a, b) => {
+                                return new Date(b[0]) - new Date(a[0]);
+                            });
+                            
+                            // 表示を構築
+                            let html = `<div class="text-[10px] font-black uppercase italic mb-3" style="color: var(--accent-primary)">Daily Stats</div>`;
+                            // ヘッダー行（ラベル）
+                            html += `<div class="grid grid-cols-[80px_1fr_1fr_1fr_1fr_1fr] gap-3 items-center text-[8px] text-slate-400 uppercase font-bold pb-1 mb-1 border-b border-white/10">
+                                <span class="text-left">Date</span>
+                                <span class="text-center">Sessions</span>
+                                <span class="text-center">Questions</span>
+                                <span class="text-center">Accuracy</span>
+                                <span class="text-center">Score</span>
+                                <span class="text-center">EXP</span>
+                            </div>`;
+                            sortedDailyStats.forEach(([dateStr, stats]) => {
+                                const accuracy = stats.totalQ > 0 ? Math.round((stats.correctQ / stats.totalQ) * 100) : 0;
+                                html += `<div class="grid grid-cols-[80px_1fr_1fr_1fr_1fr_1fr] gap-3 items-center text-[9px] text-slate-300 py-1.5 border-b border-white/5">
+                                    <span class="text-left">${dateStr}</span>
+                                    <span class="text-cyan-400 font-bold text-center">${stats.count} session${stats.count > 1 ? 's' : ''}</span>
+                                    <span class="text-cyan-400 font-bold text-center">${stats.totalQ} Q</span>
+                                    <span class="text-emerald-400 font-bold text-center">${accuracy}%</span>
+                                    <span class="text-slate-400 font-bold text-center">${stats.correctQ}/${stats.totalQ}</span>
+                                    <span class="text-indigo-400 font-bold text-center">+${stats.gainedExp} EXP</span>
+                                </div>`;
+                            });
+                            dailyStatsEl.innerHTML = html;
+                            dailyStatsEl.style.display = '';
+                        } else {
+                            dailyStatsEl.innerHTML = '<div class="text-[9px] text-slate-500/70 py-2 italic">No data available</div>';
+                            dailyStatsEl.style.display = '';
+                        }
+                    }
+                }
+                renderPerformanceChart(userHistory);
+            } catch (err) { console.error("Stats Error:", err); }
+        }
+
+        function ensureChartJsLoaded() {
+            if (window.Chart) return Promise.resolve();
+            if (chartScriptLoading) return chartScriptLoading;
+            chartScriptLoading = new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = 'https://cdn.jsdelivr.net/npm/chart.js';
+                script.onload = () => resolve();
+                script.onerror = () => reject(new Error('Chart.js load failed'));
+                document.head.appendChild(script);
+            });
+            return chartScriptLoading;
+        }
+
+        function renderPerformanceChart(history) {
+            if (!window.Chart) {
+                ensureChartJsLoaded()
+                    .then(() => renderPerformanceChart(history))
+                    .catch((err) => console.error('Chart.js load error:', err));
+                return;
+            }
+            const ctx = getEl('performanceChart')?.getContext('2d');
+            if (!ctx) return; if (chartInstance) chartInstance.destroy();
+            const sortedData = [...history].sort((a, b) => a.timestamp - b.timestamp);
+            const labels = ["START", ...sortedData.map(h => h.date || "")];
+            const solved = [0]; const sessionAcc = [null]; const cumAcc = [null];
+            let cumSolved = 0;
+            sortedData.forEach(h => { 
+                cumSolved += Math.round(parseFloat(h.totalQ) || 0); 
+                solved.push(cumSolved); 
+                let sNum = parseFloat(String(h.score).replace('%',''));
+                if (sNum <= 1.0 && sNum > 0) sNum *= 100;
+                sessionAcc.push(isNaN(sNum) ? null : Math.round(sNum)); 
+                let aNum = parseFloat(String(h.avg10).replace('%',''));
+                if (aNum <= 1.0 && aNum > 0) aNum *= 100;
+                cumAcc.push(isNaN(aNum) ? null : Math.round(aNum));
+            });
+            const y1Max = Math.ceil((Math.max(...solved, 0) + 1) / 50) * 50;
+            const accentColor = getComputedStyle(document.documentElement).getPropertyValue('--accent-primary').trim();
+            chartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        { label: '累計問題数', data: solved, borderColor: '#00f2ff', yAxisID: 'y1', tension: 0.4, fill: false, pointRadius: (ctx) => ctx.dataIndex === 0 ? 0 : 2, pointBackgroundColor: '#00f2ff', spanGaps: true, borderWidth: 1 },
+                        { label: '単回正解率', data: sessionAcc, borderColor: '#f59e0b', borderWidth: 1, yAxisID: 'y2', tension: 0, pointRadius: 2, pointBackgroundColor: '#f59e0b', showLine: true, spanGaps: true },
+                        { label: '直近10回平均', data: cumAcc, borderColor: accentColor, yAxisID: 'y2', tension: 0.2, pointRadius: 2, pointBackgroundColor: accentColor, borderWidth: 1, spanGaps: true }
+                    ]
+                },
+                options: { 
+                    responsive: true, maintainAspectRatio: false,
+                    layout: { padding: { left: -5, right: 0, top: 60, bottom: 5 } }, 
+                    scales: { 
+                        x: { type: 'category', display: true, ticks: { color: '#64748b', font: { size: 9 }, autoSkip: true }, grid: { display: false }, offset: false }, 
+                        y1: { type: 'linear', position: 'left', min: 0, max: y1Max, ticks: { color: '#00f2ff', stepSize: 50 }, grid: { color: 'rgba(255,255,255,0.05)' } },
+                        y2: { 
+                            type: 'linear', position: 'right', min: 0, max: 100, 
+                            ticks: { color: '#f59e0b', stepSize: 20, callback: (v) => v + '' }, 
+                            grid: { display: false } 
+                        }
+                    },
+                    plugins: { legend: { display: false } } 
+                }
+            });
+        }
+
+        // CSV形式（問題,答え）のパース関数（物理向け）
+        function parseCSVText(text, eraName) {
+            if (!text) return [];
+            const lines = text.split(/\r?\n/).filter(l => l.trim() !== "");
+            const problems = [];
+            
+            lines.forEach((line, i) => {
+                // CSVのパース（カンマで分割、ただし引用符内のカンマは無視）
+                const cols = [];
+                let current = '';
+                let inQuotes = false;
+                
+                for (let j = 0; j < line.length; j++) {
+                    const char = line[j];
+                    if (char === '"') {
+                        inQuotes = !inQuotes;
+                    } else if (char === ',' && !inQuotes) {
+                        cols.push(current.trim());
+                        current = '';
+                    } else {
+                        current += char;
+                    }
+                }
+                cols.push(current.trim()); // 最後のカラム
+                
+                if (cols.length >= 2 && cols[0] && cols[1]) {
+                    const question = cols[0].replace(/^"|"$/g, '');
+                    const answer = cols[1].replace(/^"|"$/g, '');
+                    
+                    // CSV形式では選択肢が1つ（答えのみ）なので、答えを4つの選択肢として使用
+                    // 実際のクイズでは選択肢が複数必要だが、現時点では答えを4回繰り返して選択肢とする
+                    // （将来的には、他の選択肢を生成するロジックを追加可能）
+                    const options = [answer, answer, answer, answer];
+                    
+                    problems.push({
+                        id: `${eraName}-${i + 1}`,
+                        era: eraName,
+                        question: question,
+                        tag: "標準", // CSV形式ではタグ情報がないためデフォルト値
+                        options: options,
+                        answer: answer,
+                        explanation: `正解: ${answer}` // 簡易的な解説
+                    });
+                }
+            });
+            
+            return problems;
+        }
+
+        function parseTSVText(text, eraName) {
+            if (!text) return [];
+            const lines = text.split(/\r?\n/).filter(l => l.trim() !== "");
+            const problems = [];
+            
+            // ヘッダー行の候補（一般的なヘッダー名）
+            const headerKeywords = ["問題", "問", "元素記号", "元素名", "原子番号", "記号", "名称", "番号"];
+            
+            lines.forEach((line, i) => {
+                const cols = line.split('\t').map(c => c.trim().replace(/^"|"$/g, ''));
+                
+                // ヘッダー行をスキップ（最初の行で、かつヘッダーキーワードに一致する場合）
+                if (i === 0 && headerKeywords.some(keyword => cols[0] === keyword || cols.some(c => c === keyword))) {
+                    return; // スキップ
+                }
+                
+                // 空行をスキップ
+                if (cols.length === 0 || cols.every(c => !c || c.trim() === '')) {
+                    return;
+                }
+                
+                // データ形式の判定と処理
+                // 形式1: 標準TSV形式（問題、選択肢1-4、...、正解番号、解説）
+                if (cols.length >= 5) {
+                    let qRaw = cols[0].replace(/^[（\(](基礎|標準|応用|発展)[）\)]/, "").trim().replace(/([①②③④])/g, '<br>$1').replace(/^<br>/, '');
+                    let tag = cols[0].match(/^[（\(](基礎|標準|応用|発展)[）\)]/)?.[1] || "標準";
+                    let rawExpl = (cols[13] || cols[14] || "詳細解説準備中。");
+                    problems.push({ 
+                        id: `${eraName}-${problems.length + 1}`, 
+                        era: eraName, 
+                        question: qRaw, 
+                        tag, 
+                        options: [cols[1], cols[2], cols[3], cols[4]], 
+                        answer: (parseInt(cols[10]) >= 1 && parseInt(cols[10]) <= 4) ? cols[parseInt(cols[10])] : cols[10], 
+                        explanation: rawExpl.replace(/([①②③④])/g, '<br>$1') 
+                    });
+                }
+                // 形式2: 簡易形式（2-3列: 問題、答え、または問題、選択肢1、選択肢2、選択肢3、選択肢4、答え）
+                else if (cols.length >= 2) {
+                    const question = cols[0];
+                    let answer = '';
+                    let options = [];
+                    
+                    // 2列形式: 問題、答え
+                    if (cols.length === 2) {
+                        answer = cols[1];
+                        options = [answer, answer, answer, answer]; // 答えを4回繰り返す
+                    }
+                    // 3-6列形式: 問題、選択肢1、選択肢2、選択肢3、選択肢4、答え
+                    else if (cols.length >= 3 && cols.length <= 6) {
+                        options = [cols[1] || '', cols[2] || '', cols[3] || '', cols[4] || ''].filter(o => o);
+                        answer = cols[cols.length - 1] || cols[1] || ''; // 最後の列が答え、なければ2列目
+                        // 選択肢が不足している場合は答えで補完
+                        while (options.length < 4) {
+                            options.push(answer || '');
+                        }
+                    }
+                    
+                    if (question && answer) {
+                        problems.push({
+                            id: `${eraName}-${problems.length + 1}`,
+                            era: eraName,
+                            question: question,
+                            tag: "標準",
+                            options: options.slice(0, 4),
+                            answer: answer,
+                            explanation: `正解: ${answer}`
+                        });
+                    }
+                }
+            });
+            
+            return problems;
+        }
+
+        window.renderEraMenu = () => {
+            const container = getEl('era-menu-container'); if(!container) return;
+            let rawData = localStorage.getItem('ethics_data_main');
+            
+            // 以前の日本史バージョンのデータがある場合は、それも確認
+            if (!rawData || rawData === '{}' || rawData === 'null') {
+                const oldData = localStorage.getItem('nihonshi_tsv_ultra_main');
+                if (oldData) {
+                    console.log('以前の日本史データが見つかりました。移行します...');
+                    localStorage.setItem('ethics_data_main', oldData);
+                    rawData = oldData;
+                }
+            }
+            
+            let storedTSV = {};
+            try {
+                storedTSV = rawData ? JSON.parse(rawData) : {};
+            } catch (e) {
+                console.error('JSONパースエラー:', e, rawData);
+                container.innerHTML = '<div class="text-[9px] text-red-400 text-center py-4 italic">データの形式が正しくありません</div>';
+                return;
+            }
+            
+            // デバッグ用（コンソールに表示）
+            console.log('ローカルストレージの生データ:', rawData?.substring(0, 200));
+            console.log('パース後のstoredTSV:', storedTSV);
+            console.log('storedTSVの型:', typeof storedTSV);
+            console.log('storedTSVのキー:', Object.keys(storedTSV));
+            
+            // CSV形式とTSV形式を自動判別してパース
+            masterDataTotal = Object.entries(storedTSV).flatMap(([category, data]) => {
+                if (isSystemOrConfigSheetName(category)) {
+                    console.log(`システム/設定シート "${category}" は表示対象から除外`);
+                    return [];
+                }
+                if (!data || data.trim() === '') {
+                    console.warn(`カテゴリ "${category}" のデータが空です`);
+                    return [];
+                }
+                
+                // 最初の行を確認してフォーマットを判別
+                const firstLine = data.split(/\r?\n/)[0] || '';
+                const tabCols = firstLine.split('\t');
+                const commaCols = firstLine.split(',');
+                
+                // TSV形式（タブ区切り）かCSV形式（カンマ区切り）かを判別
+                // タブの数が多い場合はTSV、カンマの数が多い場合はCSV
+                if (tabCols.length > commaCols.length) {
+                    // TSV形式としてパース
+                    const parsed = parseTSVText(data, category);
+                    console.log(`カテゴリ "${category}" (TSV形式): ${parsed.length}問を読み込み`);
+                    return parsed;
+                } else {
+                    // CSV形式としてパース
+                    const parsed = parseCSVText(data, category);
+                    console.log(`カテゴリ "${category}" (CSV形式): ${parsed.length}問を読み込み`);
+                    return parsed;
+                }
+            });
+            container.innerHTML = '';
+            
+            // 物理の分野（シート名）をスプレッドシートから動的に取得
+            // GASスクリプトから取得したシート名がstoredTSVのキーとして含まれている
+            // 指定された順序で表示（スプレッドシートの実際のシート名を優先）
+            // 全てのシート名を取得（スプレッドシートから動的に取得）
+            const allSheetNames = Object.keys(storedTSV).filter(name => !isSystemOrConfigSheetName(name));
+            console.log('取得したシート名:', allSheetNames);
+            console.log('masterDataTotalの件数:', masterDataTotal.length);
+            
+            if (allSheetNames.length === 0) {
+                const dataExists = rawData !== null && rawData !== '{}' && rawData !== '';
+                const debugInfo = dataExists ? 'データは存在しますが、シート名が取得できませんでした' : 'ローカルストレージにデータが見つかりません';
+                container.innerHTML = `
+                    <div class="text-[9px] text-slate-500 text-center py-4 italic space-y-2">
+                        <div>データを同期してください</div>
+                        <div class="text-red-400 text-[8px]">${debugInfo}<br>「Sync」ボタンをクリックしてデータを取得してください</div>
+                        <div class="text-amber-400 text-[7px] mt-2">デバッグ: ブラウザの開発者ツール（F12 または Cmd+Option+I）のConsoleタブで詳細を確認できます<br>データタイプ: ${typeof storedTSV}, キー数: ${allSheetNames.length}</div>
+                    </div>
+                `;
+                return;
+            }
+            
+            // スプレッドシートのシート順序を取得（左から右の順序）
+            let sheetOrder = [];
+            try {
+                const savedSheetOrder = localStorage.getItem('ethics_sheet_order');
+                if (savedSheetOrder) {
+                    sheetOrder = JSON.parse(savedSheetOrder);
+                    console.log('保存されたシート順序:', sheetOrder);
+                }
+            } catch (e) {
+                console.error('シート順序の読み込みエラー:', e);
+            }
+            
+            // シート順序が存在する場合はそれを使用、ない場合はallSheetNamesの順序を使用
+            let categories = [];
+            if (sheetOrder.length > 0) {
+                // シート順序に存在するシート名のみを順序通りに取得
+                categories = sheetOrder.filter(name => allSheetNames.includes(name));
+                // シート順序にないシート名を追加（新しく追加されたシートなど）
+                const missingSheets = allSheetNames.filter(name => !sheetOrder.includes(name));
+                categories = [...categories, ...missingSheets];
+            } else {
+                // シート順序が保存されていない場合は、allSheetNamesの順序を使用
+                categories = allSheetNames;
+            }
+            
+            console.log('表示するカテゴリ順序:', categories);
+            
+            const eraSessionStats = buildEraSessionStats(userHistory);
+            
+            // 各分野（シート名）を表示
+            categories.forEach((categoryName) => {
+                let categoryProblems = masterDataTotal.filter(d => d.era === categoryName);
+                
+                // Weak Pointsモードの場合は、通常のメニュー表示をスキップ（後で専用UIを表示）
+                if (isWeakPointsMode) {
+                    return; // Weak Pointsモードの場合は通常のメニューを表示しない
+                }
+                
+                const eHeader = document.createElement('div'); 
+                eHeader.className = 'era-header'; 
+                const sessionInfo = eraSessionStats[categoryName] || { count: 0, lastTs: 0 };
+                const lastDateDisplay = formatDateYmd(sessionInfo.lastTs);
+                eHeader.innerHTML = `
+                    <div class="flex flex-col min-w-0">
+                        <span>${categoryName} <small class="opacity-50">(${categoryProblems.length})</small></span>
+                        <span class="text-[10px] text-slate-400 leading-tight">解いた回数: ${sessionInfo.count}回</span>
+                        <span class="text-[10px] text-slate-400 leading-tight">最終: ${lastDateDisplay}</span>
+                    </div>
+                    <i class="fas fa-chevron-right text-[10px]"></i>
+                `;
+                eHeader.onclick = () => {
+                    if (categoryProblems.length === 0) return;
+                    currentSessionEra = categoryName;
+                    currentSessionRangeLabel = `ALL(${categoryProblems.length})`;
+                    quizData = categoryProblems.slice();
+                    startQuiz();
+                };
+                
+                container.appendChild(eHeader);
+            });
+            setTimeout(window.updateEraMenuScrollHint, 0);
+            
+            // Weak Pointsモード用のUIを追加
+            if (isWeakPointsMode) {
+                const weakPointsContainer = document.createElement('div');
+                weakPointsContainer.className = 'glass-panel rounded-[1.5rem] md:rounded-[2.5rem] p-5 md:p-8 space-y-4';
+                
+                const weakPointsHeader = document.createElement('div');
+                weakPointsHeader.className = 'text-center space-y-2';
+                weakPointsHeader.innerHTML = `
+                    <h2 class="text-xl md:text-3xl font-flashy text-rose-300">今日の復習</h2>
+                    <p class="text-[10px] md:text-sm text-slate-300">10問（短時間）</p>
+                `;
+                
+                const startWeakPointsBtn = document.createElement('button');
+                startWeakPointsBtn.className = 'w-full bg-rose-600 hover:bg-rose-700 text-white font-black py-4 rounded-2xl text-lg uppercase tracking-widest transition-all';
+                startWeakPointsBtn.innerText = '復習を開始';
+                startWeakPointsBtn.onclick = () => {
+                    const selectedProblems = selectWeakPointsProblems();
+                    if (selectedProblems.length === 0) {
+                        showModal("復習問題なし", "復習すべき問題がありません。通常モードで問題を解いてから再度お試しください。");
+                        return;
+                    }
+                    quizData = selectedProblems;
+                    currentSessionEra = "復習モード";
+                    currentSessionRangeLabel = "Weak Points";
+                    startQuiz();
+                };
+                
+                weakPointsContainer.appendChild(weakPointsHeader);
+                weakPointsContainer.appendChild(startWeakPointsBtn);
+                container.appendChild(weakPointsContainer);
+            }
+        };
+        
+        window.updateEraMenuScrollHint = () => {
+            const menu = getEl('era-menu-container');
+            const hint = getEl('era-scroll-hint');
+            const fade = getEl('era-scroll-fade');
+            if (!menu || !hint || !fade) return;
+            
+            const hasOverflow = menu.scrollHeight > menu.clientHeight + 2;
+            if (!hasOverflow) {
+                hint.classList.add('hidden');
+                fade.classList.add('hidden');
+                return;
+            }
+            
+            hint.classList.remove('hidden');
+            const nearBottom = menu.scrollTop + menu.clientHeight >= menu.scrollHeight - 4;
+            fade.classList.toggle('hidden', nearBottom);
+        };
+        
+        // Weak Pointsモード用の問題選択関数
+        function selectWeakPointsProblems() {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const todayTimestamp = today.getTime();
+            
+            // 全問題を取得
+            const allProblems = [...masterDataTotal];
+            
+            // 各問題をカテゴリに分類
+            const categoryA = []; // wrong_streak >= 2
+            const categoryB = []; // wrong_streak >= 1 かつ last_wrong_at から数日経過（3日以上）
+            const categoryC = []; // 直近で間違えた問題（last_wrong_at が最近）
+            const categoryD = []; // 正解だが last_right_at から時間が経過（due_at が今日以前）
+            
+            allProblems.forEach(q => {
+                const stats = questionStats[q.id];
+                
+                // 問題を一度も解いていない場合はスキップ（復習対象外）
+                if (!stats || !stats.total || stats.total === 0) {
+                    return;
+                }
+                
+                // 初期化されていない場合はデフォルト値を設定
+                const wrong_streak = stats.wrong_streak || 0;
+                const last_wrong_at = stats.last_wrong_at || null;
+                const last_right_at = stats.last_right_at || null;
+                const due_at = stats.due_at || null;
+                
+                // カテゴリA: wrong_streak >= 2
+                if (wrong_streak >= 2) {
+                    categoryA.push(q);
+                }
+                // カテゴリB: wrong_streak >= 1 かつ last_wrong_at から3日以上経過
+                else if (wrong_streak >= 1 && last_wrong_at) {
+                    const daysSinceWrong = Math.floor((todayTimestamp - last_wrong_at) / (1000 * 60 * 60 * 24));
+                    if (daysSinceWrong >= 3) {
+                        categoryB.push(q);
+                    } else {
+                        // カテゴリC: 直近で間違えた問題（3日未満）
+                        categoryC.push(q);
+                    }
+                }
+                // カテゴリC: wrong_streak >= 1 だが last_wrong_at がない場合（古いデータ）
+                else if (wrong_streak >= 1) {
+                    categoryC.push(q);
+                }
+                // カテゴリD: 正解だが due_at が今日以前（復習が必要）
+                else if (due_at && due_at <= todayTimestamp) {
+                    categoryD.push(q);
+                }
+                // カテゴリD: due_at がないが、last_right_at から10日以上経過している場合
+                else if (!due_at && last_right_at) {
+                    const daysSinceRight = Math.floor((todayTimestamp - last_right_at) / (1000 * 60 * 60 * 24));
+                    if (daysSinceRight >= 10) {
+                        categoryD.push(q);
+                    }
+                }
+            });
+            
+            // 各カテゴリをシャッフル
+            shuffleArray(categoryA);
+            shuffleArray(categoryB);
+            shuffleArray(categoryC);
+            shuffleArray(categoryD);
+            
+            // 10問を選択（A:4問、B:3問、C:2問、D:1問）
+            const selected = [];
+            
+            // Aから4問
+            selected.push(...categoryA.slice(0, 4));
+            
+            // Bから3問（不足時はAから補完）
+            if (categoryB.length >= 3) {
+                selected.push(...categoryB.slice(0, 3));
+            } else {
+                selected.push(...categoryB);
+                const remaining = 3 - categoryB.length;
+                selected.push(...categoryA.slice(4, 4 + remaining));
+            }
+            
+            // Cから2問（不足時はB→Aから補完）
+            if (categoryC.length >= 2) {
+                selected.push(...categoryC.slice(0, 2));
+            } else {
+                selected.push(...categoryC);
+                const remaining = 2 - categoryC.length;
+                if (categoryB.length > 3) {
+                    selected.push(...categoryB.slice(3, 3 + remaining));
+                } else {
+                    const fromA = Math.min(remaining, categoryA.length - selected.filter(q => categoryA.includes(q)).length);
+                    selected.push(...categoryA.slice(4 + (3 - categoryB.length), 4 + (3 - categoryB.length) + fromA));
+                }
+            }
+            
+            // Dから1問（不足時はC→B→Aから補完）
+            if (categoryD.length >= 1) {
+                selected.push(...categoryD.slice(0, 1));
+            } else {
+                // Dが不足している場合、他のカテゴリから補完
+                const remaining = 1;
+                if (categoryC.length > 2) {
+                    selected.push(...categoryC.slice(2, 2 + remaining));
+                } else if (categoryB.length > 3) {
+                    selected.push(...categoryB.slice(3, 3 + remaining));
+                } else {
+                    const fromA = Math.min(remaining, categoryA.length - selected.filter(q => categoryA.includes(q)).length);
+                    selected.push(...categoryA.slice(4 + (3 - categoryB.length) + (2 - categoryC.length), 4 + (3 - categoryB.length) + (2 - categoryC.length) + fromA));
+                }
+            }
+            
+            // 10問に満たない場合は、全カテゴリからランダムに補完
+            if (selected.length < 10) {
+                const remaining = 10 - selected.length;
+                const allRemaining = [...categoryA, ...categoryB, ...categoryC, ...categoryD]
+                    .filter(q => !selected.includes(q));
+                shuffleArray(allRemaining);
+                selected.push(...allRemaining.slice(0, remaining));
+            }
+            
+            return selected.slice(0, 10); // 必ず10問
+        };
+
+        function startQuiz() { 
+            currentIdx = 0; score = 0; streak = 0; sessionAnswers = []; 
+            // シャッフルが有効な場合、問題の出題順をシャッフル
+            if (isQuestionShuffleEnabled) {
+                quizData = shuffleArray([...quizData]);
+            }
+            getEl('home-screen').classList.add('hidden'); getEl('quiz-screen').classList.remove('hidden'); getEl('q-total').innerText = quizData.length; renderDots(); showQuestion(); 
+        }
+        function showQuestion() { 
+            canAnswer = true; const q = quizData[currentIdx]; getEl('q-current').innerText = currentIdx + 1; 
+            getEl('current-accuracy').innerText = (currentIdx === 0 ? 0 : Math.round((score/currentIdx)*100)) + '%'; 
+            getEl('current-streak').innerText = streak; getEl('diff-badge').innerText = `${q.era} | ${q.tag}`; 
+            const statKey = q.id;
+            const qs = questionStats[statKey] || { total: 0, correct: 0 }; 
+            if(getEl('q-history-stat')) getEl('q-history-stat').innerText = `${qs.total === 0 ? 0 : Math.round((qs.correct / qs.total) * 100)}% (${qs.correct}/${qs.total})`; 
+            let qText = q.question
+                .replace(/適切でないもの/g, '<span class="text-rose-400 font-bold">適切でないもの</span>')
+                .replace(/適切なもの/g, '<span class="text-emerald-400 font-bold">適切なもの</span>')
+                .replace(/誤っているもの/g, '<span class="text-rose-400 font-bold">誤っているもの</span>')
+                .replace(/正しいもの/g, '<span class="text-emerald-400 font-bold">正しいもの</span>')
+                .replace(/正しい/g, '<span class="text-emerald-400 font-bold">正しい</span>')
+                .replace(/誤っている/g, '<span class="text-rose-400 font-bold">誤っている</span>')
+                .replace(/^<br>/, '')
+                .replace(/^\s+/, ''); // 最初の行の先頭の<br>と空白を削除
+            const questionEl = getEl('question-text');
+            questionEl.innerHTML = qText;
+            // KaTeXで数式をレンダリング（DOM更新後に実行）
+            setTimeout(() => renderMath(questionEl), 100);
+            
+            const oc = getEl('options-container'); oc.innerHTML = ''; 
+            shuffleArray([...q.options]).forEach((opt) => { 
+                const btn = document.createElement('button'); 
+                btn.className = "option-btn"; 
+                // 選択肢のテキストをHTMLに設定（data属性に元の値を保存）
+                btn.setAttribute('data-original-text', opt);
+                const optSpan = document.createElement('span');
+                optSpan.innerHTML = opt;
+                btn.appendChild(optSpan);
+                // KaTeXで数式をレンダリング（DOM更新後に実行）
+                setTimeout(() => renderMath(optSpan), 100);
+                btn.onclick = () => handleAnswer(opt, btn); 
+                oc.appendChild(btn); 
+            }); 
+            getEl('feedback-area').classList.add('hidden');
+            // 確実に画面上部へスクロール（複数手段を併用）
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            document.body.scrollTop = 0;          // Safari 対応
+            document.documentElement.scrollTop = 0; // その他ブラウザ対応
+            // 念のため遅延して再スクロール
+            setTimeout(() => {
+                window.scrollTo({ top: 0, behavior: 'auto' });
+            }, 50);
+        }
+        
+        async function handleAnswer(selected, btn) { 
+            if (!canAnswer) return; canAnswer = false; const q = quizData[currentIdx]; const isCorrect = (selected === q.answer); sessionAnswers[currentIdx] = isCorrect; 
+            const statKey = q.id;
+            const exist = questionStats[statKey] || { total: 0, correct: 0 }; 
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const todayTimestamp = today.getTime();
+            
+            // 既存データとの互換性を保つため、復習システムの情報を初期化
+            const wrong_streak = exist.wrong_streak !== undefined ? exist.wrong_streak : 0;
+            const last_wrong_at = exist.last_wrong_at || null;
+            const last_right_at = exist.last_right_at || null;
+            
+            // 復習システムの状態遷移ルール
+            if (isCorrect) {
+                // 正解時
+                if (wrong_streak >= 1) {
+                    // wrong_streak >= 1 の場合：wrong_streak -= 1, due_at = 今日 + 3日
+                    const newDueDate = new Date(today);
+                    newDueDate.setDate(newDueDate.getDate() + 3);
+                    questionStats[statKey] = { 
+                        total: exist.total + 1, 
+                        correct: exist.correct + 1, 
+                        lastDate: Date.now(),
+                        wrong_streak: Math.max(0, wrong_streak - 1),
+                        last_wrong_at: last_wrong_at,
+                        last_right_at: todayTimestamp,
+                        due_at: newDueDate.getTime()
+                    };
+                } else {
+                    // wrong_streak == 0 の場合：due_at = 今日 + 10日
+                    const newDueDate = new Date(today);
+                    newDueDate.setDate(newDueDate.getDate() + 10);
+                    questionStats[statKey] = { 
+                        total: exist.total + 1, 
+                        correct: exist.correct + 1, 
+                        lastDate: Date.now(),
+                        wrong_streak: 0,
+                        last_wrong_at: last_wrong_at,
+                        last_right_at: todayTimestamp,
+                        due_at: newDueDate.getTime()
+                    };
+                }
+            } else {
+                // 不正解時：wrong_streak += 1, due_at = 今日 + 1日
+                const newDueDate = new Date(today);
+                newDueDate.setDate(newDueDate.getDate() + 1);
+                questionStats[statKey] = { 
+                    total: exist.total + 1, 
+                    correct: exist.correct, 
+                    lastDate: Date.now(),
+                    wrong_streak: wrong_streak + 1,
+                    last_wrong_at: todayTimestamp,
+                    last_right_at: last_right_at,
+                    due_at: newDueDate.getTime()
+                };
+            } 
+            if (isCorrect) { score++; streak++; getEl(`dot-${currentIdx}`).classList.add('dot-correct'); } 
+            else { streak = 0; getEl(`dot-${currentIdx}`).classList.add('dot-wrong'); } 
+            const btns = getEl('options-container').getElementsByTagName('button'); 
+            for (let b of btns) { 
+                b.disabled = true; 
+                // data属性から元のテキストを取得して比較（数式レンダリング後でも正しく動作）
+                const originalText = b.getAttribute('data-original-text') || '';
+                if (originalText.trim() === q.answer.trim()) {
+                    b.classList.add('border-emerald-500', 'bg-emerald-500/20');
+                } else if (originalText.trim() === selected.trim() && !isCorrect) {
+                    b.classList.add('border-rose-500', 'bg-rose-500/20');
+                }
+            } 
+            getEl('feedback-area').classList.remove('hidden'); 
+            const explanationEl = getEl('explanation-content');
+            explanationEl.innerHTML = q.explanation;
+            // 解説でも数式をレンダリング（DOM更新後に実行）
+            setTimeout(() => renderMath(explanationEl), 100);
+            getEl('result-badge').innerText = isCorrect ? 'CORRECT' : 'INCORRECT'; 
+            getEl('result-badge').className = "px-6 py-2 rounded-full text-[10px] font-black uppercase w-fit " + (isCorrect ? "bg-emerald-500" : "bg-rose-500"); 
+            const voiceList = isCorrect ? praiseWords.perfect : praiseWords.low; getEl('voice-message').innerText = voiceList[Math.floor(Math.random() * voiceList.length)]; setTimeout(() => { getEl('feedback-area').scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 100); 
+        }
+
+        function renderDots() { const bar = getEl('dot-bar'); if(!bar) return; bar.innerHTML = ''; quizData.forEach((_, i) => { const d = document.createElement('div'); d.className = 'progress-dot'; d.id = `dot-${i}`; bar.appendChild(d); }); }
+        function showModal(title, message) { const modal = getEl('custom-modal'); if(modal) { getEl('modal-title').innerText = title; getEl('modal-message').innerText = message; modal.classList.add('active'); } }
+        
+        // 新版専用: 診断情報付きエラー表示
+        function showDiagnosticError(error, isAuto = false) {
+            let errorTitle = '同期エラー';
+            let errorMessage = '';
+            let diagnosticInfo = '';
+            
+            if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
+                errorTitle = 'ネットワークエラー';
+                errorMessage = 'GASへの接続に失敗しました。';
+                diagnosticInfo = '原因: CORSエラーまたはネットワーク接続の問題\n\n対策:\n1. GAS URLが正しいか確認\n2. GASスクリプトが「ウェブアプリ」としてデプロイされているか確認\n3. デプロイ設定で「アクセスできるユーザー: 全員」になっているか確認\n4. ブラウザのコンソール（F12）で詳細を確認';
+            } else if (error.message.includes('リダイレクト') || error.message.includes('302') || error.message.includes('301')) {
+                errorTitle = 'リダイレクトエラー';
+                errorMessage = 'GASへのアクセスがリダイレクトされました。';
+                diagnosticInfo = '原因: GASのデプロイ設定の問題\n\n対策:\n1. GASスクリプトを「ウェブアプリ」としてデプロイ\n2. 「アクセスできるユーザー: 全員」に設定\n3. 「次のユーザーとして実行: 自分」に設定\n4. 新しいデプロイを作成してURLを更新';
+            } else if (error.message.includes('403') || error.message.includes('Forbidden')) {
+                errorTitle = 'アクセス権限エラー';
+                errorMessage = 'GASへのアクセスが拒否されました。';
+                diagnosticInfo = '原因: アクセス権限が不足しています\n\n対策:\n1. GASスクリプトのデプロイ設定で「アクセスできるユーザー: 全員」を選択\n2. 新しいデプロイを作成してURLを取得\n3. HTMLファイルのGAS URLを更新';
+            } else if (error.message.includes('404') || error.message.includes('Not Found')) {
+                errorTitle = 'GAS URLエラー';
+                errorMessage = 'GASスクリプトが見つかりません。';
+                diagnosticInfo = '原因: GAS URLが間違っているか、デプロイが無効\n\n対策:\n1. GASスクリプトがデプロイされているか確認\n2. GAS URLが正しいか確認\n3. デプロイID（URLの最後の文字列）が最新か確認';
+            } else if (error.message.includes('500') || error.message.includes('サーバーエラー')) {
+                errorTitle = 'GASサーバーエラー';
+                errorMessage = 'GASスクリプトでエラーが発生しました。';
+                diagnosticInfo = `原因: GASスクリプト内のエラー\n\n詳細: ${error.message}\n\n対策:\n1. GASスクリプトの実行ログを確認\n2. スプレッドシートIDが正しいか確認\n3. スプレッドシートへのアクセス権限を確認`;
+            } else if (error.message.includes('HTMLが返されました') || error.message.includes('ログイン')) {
+                errorTitle = '認証エラー';
+                errorMessage = 'GASへのアクセスで認証が必要です。';
+                diagnosticInfo = '原因: GASのデプロイ設定が「アクセスできるユーザー: 全員」になっていない\n\n対策:\n1. GASスクリプトを開く\n2. 「デプロイ」→「管理デプロイ」をクリック\n3. 鉛筆アイコンをクリックして編集\n4. 「アクセスできるユーザー」を「全員」に変更\n5. 「更新」をクリック';
+            } else {
+                errorTitle = '同期エラー';
+                errorMessage = error.message || 'データの取得に失敗しました。';
+                diagnosticInfo = `エラー詳細: ${error.message}\n\n対策:\n1. ブラウザのコンソール（F12）で詳細を確認\n2. GAS URLとスプレッドシートIDが正しいか確認\n3. ネットワーク接続を確認`;
+            }
+            
+            console.error('❌ [新版] エラー詳細:', {
+                title: errorTitle,
+                message: errorMessage,
+                originalError: error.message,
+                stack: error.stack
+            });
+            
+            if (!isAuto) {
+                showModal(errorTitle, `${errorMessage}\n\n${diagnosticInfo}`);
+            }
+            
+            // 画面上にもエラー表示を追加
+            const errorDisplay = getEl('sync-error-display');
+            if (errorDisplay) {
+                errorDisplay.innerHTML = `
+                    <div class="bg-rose-500/20 border border-rose-500/50 rounded-xl p-4 text-left">
+                        <div class="text-rose-300 font-bold mb-2">⚠️ ${errorTitle}</div>
+                        <div class="text-rose-200 text-sm mb-2">${errorMessage}</div>
+                        <details class="text-xs text-rose-300">
+                            <summary class="cursor-pointer mb-1">詳細情報</summary>
+                            <pre class="mt-2 p-2 bg-black/30 rounded text-[10px] overflow-auto max-h-40">${diagnosticInfo}</pre>
+                        </details>
+                    </div>
+                `;
+                errorDisplay.style.display = 'block';
+            }
+        }
+
+        function finishSession() {
+            const oldExp = parseInt(getEl('total-neural-exp').innerText) || 0;
+            const oldLv = Math.floor(oldExp / 10);
+            getEl('quiz-screen').classList.add('hidden'); getEl('result-screen').classList.remove('hidden');
+            const pct = Math.round((score / quizData.length) * 100); 
+            const lvUpMsg = getEl('level-up-msg');
+            if (lvUpMsg) lvUpMsg.classList.add('hidden');
+            const expNoteEl = getEl('final-exp-note');
+            if (expNoteEl) expNoteEl.innerText = '';
+            getEl('final-exp-gained').innerText = score;
+            logDetailedResultsToSpreadsheet(pct, score, quizData.length).then((logResult) => {
+                const appliedExpRaw = parseInt(logResult && logResult.appliedExp);
+                const appliedExp = Number.isFinite(appliedExpRaw) ? appliedExpRaw : score;
+                getEl('final-exp-gained').innerText = appliedExp;
+                if (expNoteEl) {
+                    expNoteEl.innerText = (logResult && logResult.expReason) ? `※ ${logResult.expReason}` : '';
+                }
+                const newLv = Math.floor((oldExp + appliedExp) / 10);
+                if (lvUpMsg) {
+                    if (newLv > oldLv) lvUpMsg.classList.remove('hidden');
+                    else lvUpMsg.classList.add('hidden');
+                }
+            });
+            
+            // 復習システムの情報をローカルストレージに保存
+            try {
+                localStorage.setItem('ethics_question_stats', JSON.stringify(questionStats));
+            } catch (e) {
+                console.error('復習システムの情報の保存に失敗しました:', e);
+            }
+            getEl('final-score').innerText = pct;
+            const goalMsg = getEl('goal-eval-msg');
+            if (pct >= selectedGoal) {
+                goalMsg.innerText = "MISSION ACCOMPLISHED: Target Attained";
+                goalMsg.className = "text-[10px] font-black uppercase tracking-[0.3em] mb-2 text-emerald-400";
+            } else {
+                goalMsg.innerText = "TARGET MISSED: " + selectedGoal + "% required";
+                goalMsg.className = "text-[10px] font-black uppercase tracking-[0.3em] mb-2 text-rose-400";
+            }
+            const resKey = pct === 100 ? 'perfect' : pct >= 80 ? 'high' : pct >= 60 ? 'mid' : 'low';
+            getEl('final-praise').innerText = praiseWords[resKey][Math.floor(Math.random() * praiseWords[resKey].length)];
+            getEl('final-praise-jp').innerText = feedbackJP[resKey][Math.floor(Math.random() * feedbackJP[resKey].length)];
+            getEl('final-icon').innerText = pct === 100 ? "👑" : pct >= 80 ? "🎯" : pct >= 60 ? "🔋" : "⚠️";
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        window.showHome = () => { getEl('quiz-screen').classList.add('hidden'); getEl('result-screen').classList.add('hidden'); getEl('home-screen').classList.remove('hidden'); updateStatsUI(); window.renderEraMenu(); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+        
+        window.abortQuiz = () => {
+            if (confirm('演習を中断しますか？進行状況は保存されません。')) {
+                // クイズの状態をリセット
+                currentIdx = 0;
+                score = 0;
+                streak = 0;
+                sessionAnswers = [];
+                quizData = [];
+                canAnswer = true;
+                // ホーム画面に戻る
+                window.showHome();
+            }
+        };
+        
+        window.syncAllFromSpreadsheet = async (isAuto = false) => { 
+            if (!FIXED_GAS_URL) return;
+            
+            // ユーザー情報が設定されていない場合でも問題データは取得できるようにする
+            let userId = '';
+            const hasUserInfo = USER_NAME && USER_NAME.trim() !== '' && USER_CLASS && USER_NUMBER;
+            
+            if (hasUserInfo) {
+                // ユーザーIDの生成（クラス-番号-名前形式）
+                userId = `${USER_CLASS}-${USER_NUMBER}-${USER_NAME}`;
+            } else {
+                if (!isAuto) {
+                    console.warn('⚠️ [新版] ユーザー情報が未設定。問題データのみ取得します。');
+                }
+                // ユーザー情報がない場合は空文字列を渡す（問題データは取得可能）
+                userId = '';
+            }
+            
+            // UIの入力フィールドからURLを取得（存在する場合）、なければ固定URLを使用
+            const urlInput = getEl('main-spreadsheet-url');
+            const spreadsheetUrl = urlInput && urlInput.value ? urlInput.value : FIXED_SPREADSHEET_URL;
+            const sid = spreadsheetUrl.match(/\/d\/([a-zA-Z0-9-_]+)/)?.[1];
+            
+            if (!sid) {
+                console.error('スプレッドシートIDが取得できません:', spreadsheetUrl);
+                if (!isAuto) showModal("Sync Error", "スプレッドシートURLが正しくありません。");
+                return;
+            }
+            
+            try { 
+                // userIdが空の場合はパラメータを省略しない（GAS側で空文字列として処理）
+                const syncUrl = `${FIXED_GAS_URL}?action=sync&id=${sid}${userId ? `&userId=${encodeURIComponent(userId)}` : ''}`;
+                console.log('🚀 [新版] 同期を開始:', {
+                    url: syncUrl,
+                    spreadsheetId: sid,
+                    hasUserInfo: hasUserInfo,
+                    userId: userId || '(未設定)'
+                });
+                
+                const result = await fetchWithRetry(syncUrl); 
+                console.log('同期結果全体:', result);
+                console.log('resultの全キー:', Object.keys(result));
+                
+                // エラーチェック
+                if (result.error) {
+                    console.error('同期エラー:', result.error);
+                    if (!isAuto) {
+                        showModal("Sync Error", `データの取得に失敗しました: ${result.error}`);
+                    }
+                    return;
+                }
+                
+                // デバッグ情報を表示
+                if (result.debug) {
+                    console.log('デバッグ情報:', result.debug);
+                    console.log(`全シート数: ${result.debug.totalSheets}`);
+                    console.log(`除外シート: ${result.debug.excludedSheets.join(', ')}`);
+                    console.log(`読み込んだシート: ${result.debug.loadedSheets.join(', ') || '(なし)'}`);
+                    console.log(`問題シート数: ${result.debug.problemCount}`);
+                }
+                
+                console.log('result.problems:', result.problems);
+                console.log('result.problemsの型:', typeof result.problems);
+                console.log('result.problemsのキー:', result.problems ? Object.keys(result.problems) : 'null');
+                
+                // problemsの中身を詳しく確認
+                if (result.problems) {
+                    console.log('result.problemsの詳細:', JSON.stringify(result.problems).substring(0, 500));
+                    const problemKeys = Object.keys(result.problems);
+                    console.log('問題キーの数:', problemKeys.length);
+                    if (problemKeys.length > 0) {
+                        console.log('最初のキー:', problemKeys[0]);
+                        console.log('最初の値のサンプル:', typeof result.problems[problemKeys[0]], result.problems[problemKeys[0]]?.substring(0, 100));
+                    } else {
+                        console.warn('問題シートが読み込まれていません。スプレッドシートに問題シート（システム用シート以外）が存在するか確認してください。');
+                        if (!isAuto) {
+                            showModal("データなし", "問題シートが見つかりませんでした。\n\nスプレッドシートに以下のシートが存在するか確認してください：\n- システム用シート（履歴ログ、詳細履歴ログ、問題別統計DB、成績一覧、メンバー一覧）以外のシート\n- 例：力学、電磁気学など\n\nシート名がそのまま分野名として使用されます。");
+                        }
+                    }
+                } else {
+                    console.error('result.problemsが存在しません');
+                    if (!isAuto) {
+                        showModal("データエラー", "問題データが取得できませんでした。");
+                    }
+                }
+                
+                if (result.problems) {
+                    // データ構造を確認
+                    localStorage.setItem('ethics_data_main', JSON.stringify(result.problems));
+                    console.log('保存後のローカルストレージ:', localStorage.getItem('ethics_data_main')?.substring(0, 200));
+                }
+                // シートの順序を保存（スプレッドシートの左から右の順序）
+                if(result.sheetOrder && result.sheetOrder.length > 0) {
+                    localStorage.setItem('ethics_sheet_order', JSON.stringify(result.sheetOrder));
+                    console.log('シートの順序:', result.sheetOrder);
+                }
+                if(result.userStats) { 
+                    Object.entries(result.userStats).forEach(([key, s]) => { 
+                        questionStats[key] = { 
+                            total: parseInt(s.total) || 0, 
+                            correct: parseInt(s.correct) || 0,
+                            wrong_streak: parseInt(s.wrong_streak) || 0,
+                            last_wrong_at: s.last_wrong_at ? parseInt(s.last_wrong_at) : null,
+                            last_right_at: s.last_right_at ? parseInt(s.last_right_at) : null,
+                            due_at: s.due_at ? parseInt(s.due_at) : null
+                        }; 
+                    }); 
+                }
+                if(result.history) userHistory = result.history; 
+                if(result.ranking) {
+                    rankingData = result.ranking;
+                    console.log('ランキングデータ:', rankingData);
+                    if (rankingData.length > 0) {
+                        console.log('最初のランキングエントリ:', rankingData[0]);
+                        console.log('最初のエントリのキー:', Object.keys(rankingData[0]));
+                    }
+                }
+                // 連続正解数をグローバル変数に保存
+                window.currentStreak = result.currentStreak || 0;
+                window.maxStreak = result.maxStreak || 0; 
+                updateStatsUI(); window.renderEraMenu(); 
+            } catch (e) { 
+                console.error('❌ [新版] 同期エラー:', e);
+                console.error('❌ [新版] エラースタック:', e.stack);
+                
+                // 詳細なエラーメッセージを表示
+                showDiagnosticError(e, isAuto);
+            } 
+        };
+        
+        function shuffleArray(array) { for (let i = array.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [array[i], array[j]] = [array[j], array[i]]; } return array; }
+
+        const praiseWords = {
+            perfect: ["ABSOLUTELY FLAWLESS!", "PURE GENIUS AT WORK!", "BEYOND EXCELLENT!", "TOTAL MASTERY ACHIEVED!", "HISTORICAL SUPREMACY!", "THE ULTIMATE SCHOLAR!", "PERFECT NEURAL SYNC!", "UNSTOPPABLE FORCE!", "LEGENDARY PERFORMANCE!", "MASTER OF HISTORY!", "INFINITE ACCURACY!", "ROYAL ACHIEVEMENT!", "BEYOND PERFECTION!", "DIVINE KNOWLEDGE!", "GODLIKE CONCENTRATION!", "HISTORIA MAXIMA!", "ELITE LEVEL REACHED!", "TOTAL DOMINATION!", "FLAWLESS EXECUTION!", "TRUE HISTORY MASTER!"],
+            high: ["AMAZING PRECISION!", "OUTSTANDING WORK!", "ELITE PERFORMANCE!", "BRIGHT FUTURE AHEAD!", "STUNNING RESULTS!", "HIGH-SPEED SYNC!", "EXCEPTIONAL KNOWLEDGE!", "TOP-TIER ANALYSIS!", "BRILLIANT EFFORT!", "ALMOST PERFECT!", "SUPERIOR STRATEGY!", "GREAT MOMENTUM!", "SOLID EXAM-READY!", "REMARKABLE PROGRESS!", "SHARP INTELLECT!", "KEEP THIS ENERGY!", "PROFESSIONAL LEVEL!", "EXCELLENT BALANCE!", "POWERFUL INSIGHT!", "NEAR-MASTERY!"],
+            mid: ["STEADY PROGRESS!", "KEEP PUSHING FORWARD!", "STAY FOCUSED!", "SOLID FOUNDATION!", "GROWING STRONGER!", "NEURAL LINK ACTIVE!", "GOOD MOMENTUM!", "ANALYZE AND CONQUER!", "ALMOST THERE!", "STAY SHARP!", "CONSISTENT EFFORT!", "STAY VIGILANT!", "BATTLE CONTINUES!", "GAIN MORE DATA!", "EVOLVING SCHOLAR!", "KNOWLEDGE LOADING...", "KEEP THE FIRE!", "REACH FOR TOP!", "UNFOLD THE TRUTH!", "PROCESS ONGOING!"],
+            low: ["NEVER GIVE UP!", "FOCUS REQUIRED!", "STAY THE COURSE!", "RE-SYNC IMMINENT!", "ANALYZE ERRORS!", "STAY DETERMINED!", "KEEP SEARCHING!", "BUILD THE BASE!", "TRY ONCE MORE!", "KNOWLEDGE HUNTER!", "DEFIANT LEARNING!", "KEEP GRINDING!", "FUTURE IS OPEN!", "STAY HUMBLE!", "RISE ABOVE!", "STRENGTH IN PRACTICE!", "SHATTER THE LIMIT!", "REBOOT YOUR MIND!", "EMBRACE THE CHALLENGE!", "STAY BRAVE!"]
+        };
+
+        const feedbackJP = {
+            perfect: ["素晴らしい！努力が完璧な形になりました。自信を持って突き進んでください。", "全問正解！あなたの集中力と知識の深さは、合格への確かな武器になります。", "非の打ち所がない成果です。今のペースを崩さず、着実にゴールへ近づきましょう。", "完璧な同期です！この感覚を忘れないよう、日々の演習を大切にしてください。", "至高の正答率です。学んできた時間は、決してあなたを裏切りません。", "見事な満点！基礎が完璧に固まっています。応用問題もこの調子で攻略しましょう。", "圧倒的な実力ですね。今のあなたに死角はありません。本番を想定した演習を。", "努力の天才です。満点を取るのは簡単なことではありません。自分を誇りに思って。", "この100％は積み上げてきた時間の結晶です。自信を胸に、次へ進みましょう。", "素晴らしい！一問一問を大切に解く姿勢がこの結果を生みました。合格は近いです。", "お見事！知識の点と点が繋がり、面となって定着しています。その調子！", "完璧な正解率。暗記だけでなく、歴史の流れをしっかり掴めている証拠です。", "文句なしのトップ成績！この精度を維持できれば、志望校への道は明るいですよ。", "最高のパフォーマンス！疲れを感じたときは、この結果を見て自信を取り戻して。", "あなたは着実に進化しています。満点は、あなたの正しい学習法の証明です。", "素晴らしい集中力！試験会場でもこのゾーンに入れるよう、練習を重ねましょう。", "パーフェクト！歴史の証人として、全ての出来事を完璧に把握できています。", "感動的な正答率！あなたの熱意がデータに反映されています。ずっと応援しています。", "揺るぎない知識。まさにマスターの領域です。自信をさらに深めていきましょう！", "完璧です！今日得たこの「正解の感覚」を大切に、明日の学習に繋げてください。"],
+            high: ["非常に優秀なデータです。間違えた一問は、本番で得点するための「宝物」です。", "合格圏内の実力を維持できています。細かな穴を埋めることでさらに盤石に。", "素晴らしい正答率！あと一歩で完璧です。間違えた部分を丁寧にさらっておこう。", "安定感がありますね。本番でもこの冷静さを保てれば、必ず良い結果が。 ", "着実に力がついています。出来事を「なぜ」という視点で見直すとさらに伸びます。", "高スコアです！努力は確実に形になっています。油断せず、この調子で進もう。", "素晴らしい成果です。間違えた問題の解説を読み込み、自分のものにしましょう。", "優秀です！基礎知識がしっかり根付いています。次は満点を目指して挑戦を。", "このスコアは自信にして良いですよ。残りの微調整が、大きな得点差になります。", "高い水準を保てていますね。毎日の積み重ねが、あなたの実力を押し上げました。", "見事な正答率。間違えた箇所は、記憶をさらに強化するためのチャンスです。", "安定した成績ですね。学習リズムは非常に良い状態です。このまま突き進おう！", "素晴らしい！理解が深まっているのがよく分かります。流れを再確認して盤石に。", "あと少しで満点！その情熱があれば、どんな壁も乗り越えられます。頑張ろう！", "優秀なデータ同期です。間違えた問題は、今のうちに気づけて良かったと考えよう。", "順調に実力を伸ばしていますね。頑張りを一番知っているのはアプリの記録です。", "高得点です！本番でもこの精度で解ければ合格は近づきます。応援しています。", "知識の定着度が非常に高いです。さらに上を目指す姿勢が最高の結果を呼びます。", "素晴らしい！この調子で演習を重ね、苦手な時代を一つずつ消していきましょう。", "安定したスコア。日頃の努力が実力として定着しています。一歩一歩、自信を！"],
+            mid: ["一歩ずつ、確実に成長していますね。基礎は固まりました。次は応用力を磨こう。", "着実に前進しています. 間違えた問題こそ、あなたの実力を伸ばす鍵になります。", "手応えを感じ始めているはず。今は知識を繋ぎ合わせる時期。焦らず進んで。", "半分以上は正解できています。残りはもう一度教科書を見直すだけで解決します。", "努力の成果が見え始めています。毎日少しずつの積み重ねが大きな力に変わる。", "粘り強く頑張っていますね。このスコアは、あなたが挑戦し続けている証拠です。", "大丈夫、伸び代はたっぷりあります。今の悔しさをバネに、次はもっと高得点を。", "基礎ブロックの再構築が必要です。間違えた時代の流れを物語のように読み返そう。", "着実な進歩です。得意な時代を一つ作り、そこから広げるのが合格への近道です。", "学習の成果が出ています。理解できている部分は自信を持ち、曖昧な部分は今。 ", "一歩一歩、階段を上っています。今の努力は必ず本番であなたを助けてくれます。", "前向きにいきましょう！演習を繰り返すごとに知識の網目は細かくなっていきます。", "基礎はできています。用語同士の繋がりを意識すると、正答率は跳ね上がります。", "今の頑張りが未来のあなたを作ります。間違えた問題を友達だと思って向き合って。", "合格へのプロセスを歩んでいます。点数に一喜一憂せず、内容の理解を優先して。", "学習のリズムを作っていきましょう。今日できなかったことは明日できれば良い。", "着実な歩みです. 歴史の全体像が見え始めています。枝葉を足す作業に入ろう。", "成長の真っ最中にいます。諦めずに繰り返すことで、景色は必ず変わりますよ。", "手応えを信じてください。今は点数よりも解説を読んで納得することを大切に。", "頑張っていますね。一問正解するごとに以前の自分を超えています。応援してる！"],
+            low: ["焦る必要はありません。今は知識の穴を見つける最高のチャンス。一つずつ。 ", "まずは基礎単語から再確認してみましょう。土台がしっかりすれば点数は伸びる。", "リンクが少し不安定なだけ. リラックスしてもう一度解説を読んでみてください。", "ここが踏ん張りどころ. 一つずつ丁寧に理解を深めれば、必ず景色が変わります。", "今は間違いを恐れず演習しましょう。その悔しさが、本番の得点に繋がります。", "伸び代は無限大！まずは一番好きな時代から集中的に復習してみるのはどう？ ", "歴史の流れをざっと掴むところから再開しましょう。物語を楽しむ気持ちで。 ", "あなたは今、一番苦しい時期かもしれません。レベルアップには挑戦が必要です。", "点数ではなく、今日新しく知った「知識」に注目. 一歩ずつ前へ進めば大丈夫。", "大丈夫です。どんな名人も、最初は今のあなたと同じ場所からスタートした。 ", "間違えた分だけ、強くなれます。解説を「なるほど」と思うまで読み返して。 ", "深呼吸して、もう一度基礎に立ち返りましょう。急がば回れが最短ルートです。", "自分のペースで大丈夫. 他人と比べる必要はありません。昨日を超えていこう。", "知識を整理するチャンスです。年表を一度自分で書いてみると驚くほど進みます。", "諦めないで。このアプリは、あなたが再び立ち上がるのを何度でもサポートする。", "まずは一つ確実に覚えることから始めよう。その積み重ねが巨大な力になります。", "歴史は繋がりです。断片的な知識を、時代という糸で繋ぎ直す作業を今しよう。", "あなたの挑戦自体が素晴らしい。今日の結果を分析して明日の糧にしてください。", "少しずつでいい。教科書を1ページ読むだけで世界は昨日より広がっています。", "負けないで. あなたの「合格したい」という気持ちを、心から応援しています！"]
+        };
+
+        // 新版専用: DOMContentLoadedで同期を実行
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('🚀 [新版] DOMContentLoaded: 初期同期を開始');
+            
+            // ユーザー情報の初期化
+            initUserInfo();
+            
+            // ユーザー情報が既に設定されている場合は同期を実行
+            const savedName = localStorage.getItem('ethics_user_name');
+            const savedClass = localStorage.getItem('ethics_user_class');
+            const savedNumber = localStorage.getItem('ethics_user_number');
+            
+            if (savedName && savedClass && savedNumber) {
+                console.log('✅ [新版] ユーザー情報が見つかりました。同期を実行します。');
+                // 少し遅延を入れて、他の初期化が完了してから同期
+                setTimeout(() => {
+                    window.syncAllFromSpreadsheet(true).catch(err => {
+                        console.error('❌ [新版] 初期同期エラー:', err);
+                        showDiagnosticError(err);
+                    });
+                }, 500);
+            } else {
+                console.log('⏸️ [新版] ユーザー情報が未設定。問題データのみ取得します。');
+                // ユーザー情報がなくても問題データは取得可能
+                setTimeout(() => {
+                    window.syncAllFromSpreadsheet(true).catch(err => {
+                        console.error('❌ [新版] 初期同期エラー（ユーザー情報なし）:', err);
+                    });
+                }, 500);
+            }
+        });
+
+        window.onload = () => {
+            initUserInfo();
+            
+            // 復習システムの情報をローカルストレージから読み込む
+            try {
+                const savedStats = localStorage.getItem('ethics_question_stats');
+                if (savedStats) {
+                    const parsed = JSON.parse(savedStats);
+                    // 既存のquestionStatsとマージ（復習システムの情報を追加）
+                    Object.keys(parsed).forEach(key => {
+                        if (questionStats[key]) {
+                            questionStats[key] = { ...questionStats[key], ...parsed[key] };
+                        } else {
+                            questionStats[key] = parsed[key];
+                        }
+                    });
+                }
+            } catch (e) {
+                console.error('復習システムの情報の読み込みに失敗しました:', e);
+            }
+            
+            // Weak Pointsモードのボタンスタイルを初期化
+            const weakBtn = document.querySelector('button[onclick="window.toggleWeakList()"]');
+            if (weakBtn) {
+                if (isWeakPointsMode) {
+                    weakBtn.classList.add('bg-rose-600/40', 'border-rose-400/60', 'text-rose-200', 'shadow-lg', 'shadow-rose-500/50');
+                    weakBtn.classList.remove('bg-rose-500/20', 'border-rose-500/30', 'text-rose-300');
+                } else {
+                    weakBtn.classList.add('bg-rose-500/20', 'border-rose-500/30', 'text-rose-300');
+                    weakBtn.classList.remove('bg-rose-600/40', 'border-rose-400/60', 'text-rose-200', 'shadow-lg', 'shadow-rose-500/50');
+                }
+            }
+            
+            // 入力フィールドにデフォルトURLを設定
+            const urlInput = getEl('main-spreadsheet-url');
+            if (urlInput && (!urlInput.value || urlInput.value.trim() === '')) {
+                urlInput.value = FIXED_SPREADSHEET_URL;
+            }
+            
+            const themeGrid = getEl('theme-grid');
+            if (themeGrid) {
+                Object.entries(THEMES).forEach(([id, t]) => {
+                    const swatch = document.createElement('div');
+                    swatch.id = `swatch-${id}`;
+                    swatch.className = 'theme-swatch';
+                    swatch.style.background = t.accent;
+                    swatch.title = id;
+                    swatch.onclick = () => applyTheme(id);
+                    themeGrid.appendChild(swatch);
+                });
+            }
+            const savedTheme = localStorage.getItem('ethics_theme_mode') || 'modeA';
+            applyTheme(savedTheme);
+            window.syncAllFromSpreadsheet(true); 
+            const eraMenuEl = getEl('era-menu-container');
+            if (eraMenuEl) eraMenuEl.addEventListener('scroll', window.updateEraMenuScrollHint);
+            window.addEventListener('resize', () => setTimeout(window.updateEraMenuScrollHint, 0));
+            setOnClick('next-btn-action', () => {
+                currentIdx++;
+                if (currentIdx < quizData.length) {
+                    // 問題表示前に必ずスクロール
+                    window.scrollTo({ top: 0, behavior: 'auto' });
+                    document.body.scrollTop = 0;
+                    document.documentElement.scrollTop = 0;
+                    showQuestion();
+                } else {
+                    finishSession();
+                }
+            });
+            setOnClick('sync-all-btn-action', () => window.syncAllFromSpreadsheet(false)); 
+            setOnClick('cloud-sync-toggle-btn', () => { const area = getEl('sync-area'); if (area) area.classList.toggle('hidden'); }); 
+        };
+    </script>
+</body>
+</html>
