@@ -80,7 +80,7 @@ GitHub Pagesは既に有効になっています。変更をプッシュする�
 `science2.0.html` の以下の設定を確認：
 
 ```javascript
-const FIXED_GAS_URL = "https://script.google.com/macros/s/AKfycbzgCspd8dzqO4jofByCpQyAPot3bNXZPCE7_KuPTrOK36CuFt44rskYyLZq4KPejpQdPw/exec";
+const FIXED_GAS_URL = "https://script.google.com/macros/s/AKfycbzsheqTjtvzClj2RoRhlOln1hIbVNdncqnFjPaBPUOqBwyTPM7ZuFM8yINAFL5G2VlKrg/exec";
 const FIXED_SPREADSHEET_URL = "https://docs.google.com/spreadsheets/d/1LCGCVjeiTicyclXFTP0EaxxB_RluZJrveWPo1FdLzsk/edit";
 ```
 
