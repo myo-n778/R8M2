@@ -83,6 +83,43 @@ function readRuntimeConfigFromSheet(ss) {
   }
 }
 
+function readImageMapFromSheet(ss) {
+  try {
+    const sheet = ss.getSheetByName("画像管理");
+    if (!sheet) return [];
+    const values = sheet.getDataRange().getDisplayValues();
+    if (!values || values.length <= 1) return [];
+    const headers = values[0].map(function(h) { return String(h || '').trim(); });
+    const col = function(name) { return headers.indexOf(name); };
+    const idCol = col("image_id");
+    const pathCol = col("file_path");
+    const altCol = col("alt");
+    const pdfCol = col("source_pdf");
+    const pageCol = col("page");
+    const statusCol = col("status");
+    if (idCol < 0 || pathCol < 0) return [];
+
+    return values.slice(1).map(function(row) {
+      const imageId = String(row[idCol] || '').trim();
+      const filePath = String(row[pathCol] || '').trim();
+      const status = statusCol >= 0 ? String(row[statusCol] || '').trim() : "";
+      if (!imageId || !filePath) return null;
+      if (status === "rejected" || status === "replaced") return null;
+      return {
+        image_id: imageId,
+        file_path: filePath,
+        alt: altCol >= 0 ? String(row[altCol] || imageId).trim() : imageId,
+        source_pdf: pdfCol >= 0 ? String(row[pdfCol] || '').trim() : "",
+        page: pageCol >= 0 ? String(row[pageCol] || '').trim() : "",
+        status: status
+      };
+    }).filter(function(entry) { return !!entry; });
+  } catch (e) {
+    // 画像管理シートの不備では問題同期を止めない
+    return [];
+  }
+}
+
 function parseAccuracyToPercent(val) {
 if (val === "" || val === null || val === undefined) return null;
 let str = String(val).replace('%', '').trim();
@@ -364,7 +401,7 @@ try {
   return returnJson({ error: "Invalid argument: id - スプレッドシートが見つかりません。IDを確認してください: " + openError.toString() });
 }
 const runtimeConfig = readRuntimeConfigFromSheet(ss);
-const result = { problems: {}, userStats: {}, history: [], ranking: [], currentStreak: 0, maxStreak: 0, sheetOrder: [] };
+const result = { problems: {}, userStats: {}, history: [], ranking: [], currentStreak: 0, maxStreak: 0, sheetOrder: [], imageMap: [] };
 result.config = {
   appUrl: runtimeConfig.appUrl || "",
   perSetPerfectCap: Number(runtimeConfig.perSetPerfectCap) || 5,
@@ -372,9 +409,10 @@ result.config = {
   disableExpCaps: !!runtimeConfig.disableExpCaps,
   duplicateLogWindowSec: Number(runtimeConfig.duplicateLogWindowSec) || 60
 };
+result.imageMap = readImageMapFromSheet(ss);
 
 // システム用シートを除外するリスト
-const excludeSheets = ["履歴ログ", "詳細履歴ログ", "問題別統計DB", "成績一覧", "メンバー一覧", "設定"];
+const excludeSheets = ["履歴ログ", "詳細履歴ログ", "問題別統計DB", "成績一覧", "メンバー一覧", "設定", "画像管理"];
 const excludeSheetAliases = ["config", "settings", "_config", "_settings"];
 const normalizeSheetName = (name) => String(name || '').replace(/\u3000/g, ' ').trim();
 const isExcludedSheet = (name) => {

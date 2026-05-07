@@ -49,6 +49,31 @@
         .option-btn:not(:disabled):hover { background: rgba(255, 255, 255, 0.1); transform: translateX(6px); border-color: var(--accent-primary); }
         
         .explanation-card { line-height: 1.6; border-left: 4px solid var(--accent-primary); }
+        .question-image-block {
+            margin: 1rem 0;
+            padding: 0.75rem;
+            background: rgba(15, 23, 42, 0.36);
+            border: 1px solid rgba(148, 163, 184, 0.22);
+            border-radius: 0.75rem;
+        }
+        .question-image-block img {
+            display: block;
+            max-width: 100%;
+            height: auto;
+            margin: 0 auto;
+            border-radius: 0.5rem;
+            background: rgba(255, 255, 255, 0.96);
+        }
+        .question-image-missing {
+            margin: 0.75rem 0;
+            padding: 0.65rem 0.8rem;
+            border: 1px dashed rgba(251, 191, 36, 0.48);
+            border-radius: 0.75rem;
+            color: #fbbf24;
+            background: rgba(120, 53, 15, 0.22);
+            font-size: 0.78rem;
+            font-weight: 700;
+        }
         .fade-in { animation: fadeIn 0.4s ease-out forwards; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         
@@ -408,6 +433,7 @@
         const SHARED = window.ScienceShared || {};
         const FIXED_GAS_URL = SHARED.gasUrl || "https://script.google.com/macros/s/AKfycbzsheqTjtvzClj2RoRhlOln1hIbVNdncqnFjPaBPUOqBwyTPM7ZuFM8yINAFL5G2VlKrg/exec";
         const FIXED_SPREADSHEET_URL = "https://docs.google.com/spreadsheets/d/1LCGCVjeiTicyclXFTP0EaxxB_RluZJrveWPo1FdLzsk/edit";
+        const IMAGE_MAP_URL = "./data/image-map.json";
         const normalizeUserName = SHARED.normalizeUserName || ((name) => name ? name.normalize('NFKC').trim() : '');
         const formatDateYmd = SHARED.formatDateYmd || ((timestamp) => {
             const ts = Number(timestamp) || 0;
@@ -448,6 +474,8 @@
         let rankingData = [];
         let selectedGoal = 80;
         let runtimeConfigState = null;
+        let imageMapById = {};
+        let imageMapLoadPromise = null;
 
         // ステータスメッセージのリスト（20個）
         const STATUS_MESSAGES = [
@@ -649,6 +677,75 @@
                 console.error('Math rendering error:', e);
                 return text;
             }
+        }
+
+        function escapeHtmlAttribute(value) {
+            return String(value || '')
+                .replace(/&/g, '&amp;')
+                .replace(/"/g, '&quot;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;');
+        }
+
+        function normalizeImageMap(raw) {
+            const entries = Array.isArray(raw) ? raw : Object.keys(raw || {}).map((key) => {
+                const entry = raw[key] || {};
+                return Object.assign({ image_id: key }, entry);
+            });
+            const normalized = {};
+            entries.forEach((entry) => {
+                const id = String(entry.image_id || entry.id || '').trim();
+                const filePath = String(entry.file_path || entry.path || entry.url || '').trim();
+                if (!id || !filePath) return;
+                normalized[id] = {
+                    file_path: filePath,
+                    alt: String(entry.alt || id)
+                };
+            });
+            return normalized;
+        }
+
+        async function loadImageMap() {
+            if (imageMapLoadPromise) return imageMapLoadPromise;
+            imageMapLoadPromise = fetch(IMAGE_MAP_URL, { cache: 'no-store' })
+                .then((res) => {
+                    if (!res.ok) throw new Error(`image-map load failed: ${res.status}`);
+                    return res.json();
+                })
+                .then((json) => {
+                    const normalized = normalizeImageMap(json);
+                    if (Object.keys(normalized).length > 0 || Object.keys(imageMapById).length === 0) {
+                        imageMapById = normalized;
+                    }
+                    return imageMapById;
+                })
+                .catch((error) => {
+                    console.warn('image-map.json could not be loaded:', error);
+                    imageMapById = {};
+                    return imageMapById;
+                });
+            return imageMapLoadPromise;
+        }
+
+        function resolveImageUrl(filePath) {
+            if (/^https?:\/\//i.test(filePath)) return filePath;
+            try {
+                return new URL(filePath, window.location.href).href;
+            } catch (error) {
+                return filePath;
+            }
+        }
+
+        function renderContentWithImages(html) {
+            return String(html || '').replace(/\[\[img:([a-zA-Z0-9._:-]+)\]\]/g, (match, imageId) => {
+                const entry = imageMapById[imageId];
+                if (!entry) {
+                    return `<div class="question-image-missing">画像未登録: ${escapeHtmlAttribute(imageId)}</div>`;
+                }
+                const src = escapeHtmlAttribute(resolveImageUrl(entry.file_path));
+                const alt = escapeHtmlAttribute(entry.alt || imageId);
+                return `<figure class="question-image-block"><img src="${src}" alt="${alt}" loading="lazy"></figure>`;
+            });
         }
 
         window.applyTheme = (modeId) => {
@@ -2032,7 +2129,8 @@
             return selected.slice(0, 10); // 必ず10問
         };
 
-        function startQuiz() { 
+        async function startQuiz() { 
+            await loadImageMap();
             currentIdx = 0; score = 0; streak = 0; sessionAnswers = []; 
             // シャッフルが有効な場合、問題の出題順をシャッフル
             if (isQuestionShuffleEnabled) {
@@ -2057,7 +2155,7 @@
                 .replace(/^<br>/, '')
                 .replace(/^\s+/, ''); // 最初の行の先頭の<br>と空白を削除
             const questionEl = getEl('question-text');
-            questionEl.innerHTML = qText;
+            questionEl.innerHTML = renderContentWithImages(qText);
             // KaTeXで数式をレンダリング（DOM更新後に実行）
             setTimeout(() => renderMath(questionEl), 100);
             
@@ -2158,7 +2256,7 @@
             } 
             getEl('feedback-area').classList.remove('hidden'); 
             const explanationEl = getEl('explanation-content');
-            explanationEl.innerHTML = q.explanation;
+            explanationEl.innerHTML = renderContentWithImages(q.explanation);
             // 解説でも数式をレンダリング（DOM更新後に実行）
             setTimeout(() => renderMath(explanationEl), 100);
             getEl('result-badge').innerText = isCorrect ? 'CORRECT' : 'INCORRECT'; 
@@ -2386,6 +2484,11 @@
                     localStorage.setItem('ethics_data_main', JSON.stringify(result.problems));
                     console.log('保存後のローカルストレージ:', localStorage.getItem('ethics_data_main')?.substring(0, 200));
                 }
+                if (result.imageMap) {
+                    imageMapById = normalizeImageMap(result.imageMap);
+                    localStorage.setItem('ethics_image_map', JSON.stringify(result.imageMap));
+                    console.log('画像対応表:', Object.keys(imageMapById).length);
+                }
                 // シートの順序を保存（スプレッドシートの左から右の順序）
                 if(result.sheetOrder && result.sheetOrder.length > 0) {
                     localStorage.setItem('ethics_sheet_order', JSON.stringify(result.sheetOrder));
@@ -2528,6 +2631,7 @@
             }
             const savedTheme = localStorage.getItem('ethics_theme_mode') || 'modeA';
             applyTheme(savedTheme);
+            loadImageMap();
             window.syncAllFromSpreadsheet(true); 
             const eraMenuEl = getEl('era-menu-container');
             if (eraMenuEl) eraMenuEl.addEventListener('scroll', window.updateEraMenuScrollHint);
