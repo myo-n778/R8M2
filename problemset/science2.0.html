@@ -926,10 +926,25 @@
         function isSystemOrConfigSheetName(name) {
             const normalized = String(name || '').replace(/\u3000/g, ' ').trim();
             if (!normalized) return true;
-            const exactNames = new Set(['履歴ログ', '詳細履歴ログ', '問題別統計DB', '成績一覧', 'メンバー一覧', '設定']);
+            const exactNames = new Set(['履歴ログ', '詳細履歴ログ', '問題別統計DB', '成績一覧', 'メンバー一覧', '設定', '画像管理']);
             if (exactNames.has(normalized)) return true;
             const lower = normalized.toLowerCase();
             return ['config', 'settings', '_config', '_settings'].includes(lower);
+        }
+
+        function sanitizeProblemSheets(problemSheets) {
+            const cleaned = {};
+            Object.entries(problemSheets || {}).forEach(([sheetName, data]) => {
+                if (isSystemOrConfigSheetName(sheetName)) return;
+                cleaned[sheetName] = data;
+            });
+            return cleaned;
+        }
+
+        function sanitizeSheetOrder(sheetOrder) {
+            return Array.isArray(sheetOrder)
+                ? sheetOrder.filter((sheetName) => !isSystemOrConfigSheetName(sheetName))
+                : [];
         }
 
         function initUserInfo() { 
@@ -2481,7 +2496,8 @@
                 
                 if (result.problems) {
                     // データ構造を確認
-                    localStorage.setItem('ethics_data_main', JSON.stringify(result.problems));
+                    const cleanedProblems = sanitizeProblemSheets(result.problems);
+                    localStorage.setItem('ethics_data_main', JSON.stringify(cleanedProblems));
                     console.log('保存後のローカルストレージ:', localStorage.getItem('ethics_data_main')?.substring(0, 200));
                 }
                 if (result.imageMap) {
@@ -2491,8 +2507,9 @@
                 }
                 // シートの順序を保存（スプレッドシートの左から右の順序）
                 if(result.sheetOrder && result.sheetOrder.length > 0) {
-                    localStorage.setItem('ethics_sheet_order', JSON.stringify(result.sheetOrder));
-                    console.log('シートの順序:', result.sheetOrder);
+                    const cleanedSheetOrder = sanitizeSheetOrder(result.sheetOrder);
+                    localStorage.setItem('ethics_sheet_order', JSON.stringify(cleanedSheetOrder));
+                    console.log('シートの順序:', cleanedSheetOrder);
                 }
                 if(result.userStats) { 
                     Object.entries(result.userStats).forEach(([key, s]) => { 
