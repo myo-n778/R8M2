@@ -463,6 +463,8 @@
         let masterDataTotal = [];
         let quizData = []; let currentIdx = 0; let score = 0; let streak = 0;
         let canAnswer = true; let chartInstance = null;
+        let isSessionFinalizing = false;
+        let currentSessionId = "";
         let chartScriptLoading = null;
         let sessionAnswers = [];
         let isRankingPublic = true; // ランキング公開設定（デフォルトは公開）
@@ -1208,7 +1210,23 @@
             });
         }
 
-        async function logDetailedResultsToSpreadsheet(pct, correct, total) {
+        function createSessionId() {
+            if (window.crypto && typeof window.crypto.randomUUID === 'function') {
+                return window.crypto.randomUUID();
+            }
+            return `session-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        }
+
+        function buildSessionDetails(limit = quizData.length) {
+            return quizData.slice(0, limit).map((q, idx) => ({
+                era: q.era,
+                qIdx: q.id.split('-').pop(),
+                attemptNum: (questionStats[q.id]?.total || 1),
+                result: sessionAnswers[idx] ? "○" : "×"
+            }));
+        }
+
+        async function logDetailedResultsToSpreadsheet(pct, correct, total, detailEntries = null, rangeLabel = currentSessionRangeLabel) {
             if (!FIXED_GAS_URL) return null;
             // 入力フィールドからURLを取得
             const urlInput = getEl('main-spreadsheet-url');
@@ -1228,11 +1246,12 @@
                 userNumber: USER_NUMBER,
                 summaryAccuracy: pct + '%', 
                 summaryScore: `${correct}/${total}`, 
-                summaryRange: currentSessionRangeLabel, 
+                summaryRange: rangeLabel, 
                 summaryEra: currentSessionEra, 
-                details: JSON.stringify(quizData.map((q, idx) => ({ era: q.era, qIdx: q.id.split('-').pop(), attemptNum: (questionStats[q.id]?.total || 1), result: sessionAnswers[idx] ? "○" : "×" }))), 
+                details: JSON.stringify(detailEntries || buildSessionDetails()), 
                 gainedExp: correct, 
                 finalStreak: streak, 
+                sessionId: currentSessionId || createSessionId(),
                 isPublic: isRankingPublic ? '1' : '0', 
                 status: USER_STATUS || '' 
             };
@@ -2147,6 +2166,8 @@
         async function startQuiz() { 
             await loadImageMap();
             currentIdx = 0; score = 0; streak = 0; sessionAnswers = []; 
+            isSessionFinalizing = false;
+            currentSessionId = createSessionId();
             // シャッフルが有効な場合、問題の出題順をシャッフル
             if (isQuestionShuffleEnabled) {
                 quizData = shuffleArray([...quizData]);
@@ -2347,6 +2368,8 @@
         }
 
         function finishSession() {
+            if (isSessionFinalizing) return;
+            isSessionFinalizing = true;
             const oldExp = parseInt(getEl('total-neural-exp').innerText) || 0;
             const oldLv = Math.floor(oldExp / 10);
             getEl('quiz-screen').classList.add('hidden'); getEl('result-screen').classList.remove('hidden');
@@ -2368,7 +2391,7 @@
                     if (newLv > oldLv) lvUpMsg.classList.remove('hidden');
                     else lvUpMsg.classList.add('hidden');
                 }
-            });
+            }).finally(() => { isSessionFinalizing = false; });
             
             // 復習システムの情報をローカルストレージに保存
             try {
@@ -2394,16 +2417,27 @@
 
         window.showHome = () => { getEl('quiz-screen').classList.add('hidden'); getEl('result-screen').classList.add('hidden'); getEl('home-screen').classList.remove('hidden'); updateStatsUI(); window.renderEraMenu(); window.scrollTo({ top: 0, behavior: 'smooth' }); };
         
-        window.abortQuiz = () => {
-            if (confirm('演習を中断しますか？進行状況は保存されません。')) {
-                // クイズの状態をリセット
+        window.abortQuiz = async () => {
+            if (isSessionFinalizing) return;
+            if (confirm('演習を中断しますか？未回答の1問を不正解として記録し、連続正解は途切れます。')) {
+                isSessionFinalizing = true;
+                const firstUnansweredIdx = sessionAnswers.findIndex(answer => answer === undefined);
+                const breakIdx = firstUnansweredIdx >= 0 ? firstUnansweredIdx : currentIdx;
+                const detailLimit = Math.min(Math.max(breakIdx + 1, 1), quizData.length);
+                const details = buildSessionDetails(detailLimit);
+                const breakDetail = details[details.length - 1];
+                if (breakDetail) breakDetail.result = "×";
+                streak = 0;
+                const totalForAbort = Math.max(details.length, 1);
+                const correctForAbort = details.filter(d => d.result === "○").length;
+                const pct = Math.round((correctForAbort / totalForAbort) * 100);
+                await logDetailedResultsToSpreadsheet(pct, correctForAbort, totalForAbort, details, `${currentSessionRangeLabel} / quit`);
                 currentIdx = 0;
                 score = 0;
-                streak = 0;
                 sessionAnswers = [];
                 quizData = [];
                 canAnswer = true;
-                // ホーム画面に戻る
+                isSessionFinalizing = false;
                 window.showHome();
             }
         };
@@ -2606,7 +2640,7 @@
                     // 既存のquestionStatsとマージ（復習システムの情報を追加）
                     Object.keys(parsed).forEach(key => {
                         if (questionStats[key]) {
-                            questionStats[key] = { ...questionStats[key], ...parsed[key] };
+                            questionStats[key] = { ...parsed[key], ...questionStats[key] };
                         } else {
                             questionStats[key] = parsed[key];
                         }
