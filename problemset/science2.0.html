@@ -278,13 +278,14 @@
                             </div>
                         </div>
                         <div style="position:relative; height:240px; width:100%; margin-top: 10px;"><canvas id="performanceChart"></canvas></div>
-                        <div class="grid grid-cols-2 md:grid-cols-3 gap-2">
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
                             <div class="bg-slate-900/50 p-2 md:p-3 rounded-xl border border-white/5 text-center"><p class="text-[8px] text-slate-300 mb-0.5 uppercase font-bold">Total EXP</p><p id="total-neural-exp" class="text-sm md:text-lg font-flashy text-purple-400">0</p></div>
                             <div class="bg-slate-900/50 p-2 md:p-3 rounded-xl border border-white/5 text-center"><p class="text-[8px] text-slate-300 mb-0.5 uppercase font-bold">10回平均</p><p id="recent-accuracy" class="text-sm md:text-lg font-flashy text-orange-400">--%</p></div>
                             <div class="bg-slate-900/50 p-2 md:p-3 rounded-xl border border-white/5 text-center"><p class="text-[8px] text-slate-300 mb-0.5 uppercase font-bold">通算正答率</p><p id="best-accuracy" class="text-sm md:text-lg font-flashy text-emerald-400">--%</p></div>
                             <div class="bg-slate-900/50 p-2 md:p-3 rounded-xl border border-white/5 text-center"><p class="text-[8px] text-slate-300 mb-0.5 uppercase font-bold">累計演習</p><p id="total-sessions-count" class="text-sm md:text-lg font-flashy text-white">0</p></div>
                             <div class="bg-slate-900/50 p-2 md:p-3 rounded-xl border border-white/5 text-center"><p class="text-[8px] text-slate-300 mb-0.5 uppercase font-bold">現在連続</p><p id="current-streak-display" class="text-sm md:text-lg font-flashy text-amber-400">0</p></div>
                             <div class="bg-slate-900/50 p-2 md:p-3 rounded-xl border border-white/5 text-center"><p class="text-[8px] text-slate-300 mb-0.5 uppercase font-bold">最大連続</p><p id="max-streak-display" class="text-sm md:text-lg font-flashy text-cyan-400">0</p></div>
+                            <div class="bg-slate-900/50 p-2 md:p-3 rounded-xl border border-white/5 text-center"><p class="text-[8px] text-slate-300 mb-0.5 uppercase font-bold">Quit</p><p id="quit-count-display" class="text-sm md:text-lg font-flashy text-rose-300">0</p></div>
                         </div>
                         <div id="ranking-card-wrapper" class="ranking-card space-y-2">
                             <h3 class="text-[10px] font-black text-amber-400 uppercase italic flex items-center gap-2 mb-3"><i class="fas fa-trophy"></i> Top Scholars</h3>
@@ -478,6 +479,7 @@
         let runtimeConfigState = null;
         let imageMapById = {};
         let imageMapLoadPromise = null;
+        let quitCountState = 0;
 
         // ステータスメッセージのリスト（20個）
         const STATUS_MESSAGES = [
@@ -928,7 +930,7 @@
         function isSystemOrConfigSheetName(name) {
             const normalized = String(name || '').replace(/\u3000/g, ' ').trim();
             if (!normalized) return true;
-            const exactNames = new Set(['履歴ログ', '詳細履歴ログ', '問題別統計DB', '成績一覧', 'メンバー一覧', '設定', '画像管理']);
+            const exactNames = new Set(['履歴ログ', '詳細履歴ログ', '問題別統計DB', '成績一覧', 'メンバー一覧', '設定', '画像管理', '中断ログ']);
             if (exactNames.has(normalized)) return true;
             const lower = normalized.toLowerCase();
             return ['config', 'settings', '_config', '_settings'].includes(lower);
@@ -1264,6 +1266,36 @@
             }
         }
 
+        async function logQuitToSpreadsheet() {
+            if (!FIXED_GAS_URL) return null;
+            const urlInput = getEl('main-spreadsheet-url');
+            const spreadsheetUrl = urlInput && urlInput.value ? urlInput.value : FIXED_SPREADSHEET_URL;
+            const sid = spreadsheetUrl.match(/\/d\/([a-zA-Z0-9-_]+)/)?.[1];
+            if (!sid) return null;
+            const userId = `${USER_CLASS}-${USER_NUMBER}-${USER_NAME}`;
+            const payload = {
+                action: 'logQuit',
+                spreadsheetId: sid,
+                dbName: USER_NAME,
+                userId: userId,
+                userClass: USER_CLASS,
+                userNumber: USER_NUMBER,
+                summaryEra: currentSessionEra,
+                summaryRange: currentSessionRangeLabel,
+                currentIndex: String((currentIdx || 0) + 1),
+                total: String(quizData.length || 0),
+                sessionId: currentSessionId || createSessionId(),
+                status: USER_STATUS || ''
+            };
+            try {
+                const result = await fetchWithRetry(`${FIXED_GAS_URL}?${new URLSearchParams(payload).toString()}`);
+                window.syncAllFromSpreadsheet(true);
+                return result;
+            } catch (e) {
+                return null;
+            }
+        }
+
         function updateStatsUI() {
             try {
                 const sorted = [...userHistory].sort((a,b) => b.timestamp - a.timestamp);
@@ -1311,6 +1343,10 @@
                 
                 if (getEl('current-streak-display')) getEl('current-streak-display').innerText = currentStreak;
                 if (getEl('max-streak-display')) getEl('max-streak-display').innerText = maxStreak;
+                if (getEl('quit-count-display')) {
+                    getEl('quit-count-display').innerText = quitCountState;
+                    getEl('quit-count-display').className = "text-sm md:text-lg font-flashy " + (quitCountState >= 5 ? "text-rose-300" : quitCountState > 0 ? "text-amber-300" : "text-slate-400");
+                }
                 
                 // ランキングデータがある場合のみランクを表示（分母も含める）
                 if (rankingData && rankingData.length > 0) {
@@ -2419,19 +2455,9 @@
         
         window.abortQuiz = async () => {
             if (isSessionFinalizing) return;
-            if (confirm('演習を中断しますか？未回答の1問を不正解として記録し、連続正解は途切れます。')) {
+            if (confirm('演習を中断しますか？Quit回数として記録します。連続正解は途切れません。')) {
                 isSessionFinalizing = true;
-                const firstUnansweredIdx = sessionAnswers.findIndex(answer => answer === undefined);
-                const breakIdx = firstUnansweredIdx >= 0 ? firstUnansweredIdx : currentIdx;
-                const detailLimit = Math.min(Math.max(breakIdx + 1, 1), quizData.length);
-                const details = buildSessionDetails(detailLimit);
-                const breakDetail = details[details.length - 1];
-                if (breakDetail) breakDetail.result = "×";
-                streak = 0;
-                const totalForAbort = Math.max(details.length, 1);
-                const correctForAbort = details.filter(d => d.result === "○").length;
-                const pct = Math.round((correctForAbort / totalForAbort) * 100);
-                await logDetailedResultsToSpreadsheet(pct, correctForAbort, totalForAbort, details, `${currentSessionRangeLabel} / quit`);
+                await logQuitToSpreadsheet();
                 currentIdx = 0;
                 score = 0;
                 sessionAnswers = [];
@@ -2570,6 +2596,7 @@
                 // 連続正解数をグローバル変数に保存
                 window.currentStreak = result.currentStreak || 0;
                 window.maxStreak = result.maxStreak || 0; 
+                quitCountState = Number(result.quitCount) || 0;
                 updateStatsUI(); window.renderEraMenu(); 
             } catch (e) { 
                 console.error('❌ [新版] 同期エラー:', e);

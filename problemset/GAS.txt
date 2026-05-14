@@ -12,6 +12,7 @@ function doGet(e) {
 try {
 const action = e.parameter.action;
 if (action === 'logAll') return handleLogAll(e.parameter);
+if (action === 'logQuit') return handleLogQuit(e.parameter);
 if (action === 'updateStatus') return handleUpdateStatus(e.parameter);
 if (action === 'detectDuplicates') return handleDetectDuplicates(e.parameter);
 // syncアクションの場合
@@ -402,6 +403,77 @@ finally {
 }
 }
 
+function handleLogQuit(p) {
+let quitLock = null;
+try {
+if (!p.spreadsheetId || p.spreadsheetId.trim() === '') {
+  return returnJson({ status: "error", message: "スプレッドシートIDが指定されていません" });
+}
+let ss;
+try {
+  ss = SpreadsheetApp.openById(p.spreadsheetId);
+} catch (openError) {
+  return returnJson({ status: "error", message: "スプレッドシートが見つかりません: " + openError.toString() });
+}
+quitLock = LockService.getScriptLock();
+quitLock.waitLock(10000);
+const now = new Date();
+const timestampStr = Utilities.formatDate(now, "JST", "yyyy/MM/dd HH:mm:ss");
+const sessionId = String(p.sessionId || '').trim();
+const quitHeaders = ["日時", "単元", "範囲", "現在位置", "総問題数", "ユーザー名", "ユーザーID", "クラス", "番号", "ステータス", "セッションID"];
+const quitSheet = getOrCreateSheet(ss, "中断ログ", quitHeaders);
+const data = quitSheet.getDataRange().getValues();
+if (sessionId && data.length > 1) {
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][10] || '') === sessionId) {
+      return returnJson({
+        status: "duplicate_skipped",
+        message: "同一セッションIDのQuit記録をスキップしました",
+        quitCount: countQuitRowsForUser(quitSheet, p.userId)
+      });
+    }
+  }
+}
+quitSheet.appendRow([
+  timestampStr,
+  p.summaryEra || "",
+  p.summaryRange || "",
+  p.currentIndex || "",
+  p.total || "",
+  p.dbName || "",
+  p.userId || "",
+  p.userClass || "",
+  p.userNumber || "",
+  p.status || "",
+  sessionId
+]);
+return returnJson({
+  status: "success",
+  quitCount: countQuitRowsForUser(quitSheet, p.userId)
+});
+} catch (err) {
+  return returnJson({ status: "error", message: err.toString() });
+} finally {
+  if (quitLock) {
+    try {
+      quitLock.releaseLock();
+    } catch (releaseError) {
+      console.error("Quitロック解放エラー:", releaseError);
+    }
+  }
+}
+}
+
+function countQuitRowsForUser(quitSheet, userId) {
+  if (!quitSheet || !userId) return 0;
+  const values = quitSheet.getDataRange().getValues();
+  let count = 0;
+  for (let i = 1; i < values.length; i++) {
+    if (String(values[i][6] || '') === String(userId)) count++;
+  }
+  return count;
+}
+
 function handleSync(ssId, userId) {
 try {
 if (!ssId || ssId.trim() === '') {
@@ -415,7 +487,7 @@ try {
   return returnJson({ error: "Invalid argument: id - スプレッドシートが見つかりません。IDを確認してください: " + openError.toString() });
 }
 const runtimeConfig = readRuntimeConfigFromSheet(ss);
-const result = { problems: {}, userStats: {}, history: [], ranking: [], currentStreak: 0, maxStreak: 0, sheetOrder: [], imageMap: [] };
+const result = { problems: {}, userStats: {}, history: [], ranking: [], currentStreak: 0, maxStreak: 0, quitCount: 0, sheetOrder: [], imageMap: [] };
 result.config = {
   appUrl: runtimeConfig.appUrl || "",
   perSetPerfectCap: Number(runtimeConfig.perSetPerfectCap) || 5,
@@ -426,7 +498,7 @@ result.config = {
 result.imageMap = readImageMapFromSheet(ss);
 
 // システム用シートを除外するリスト
-const excludeSheets = ["履歴ログ", "詳細履歴ログ", "問題別統計DB", "成績一覧", "メンバー一覧", "設定", "画像管理"];
+const excludeSheets = ["履歴ログ", "詳細履歴ログ", "問題別統計DB", "成績一覧", "メンバー一覧", "設定", "画像管理", "中断ログ"];
 const excludeSheetAliases = ["config", "settings", "_config", "_settings"];
 const normalizeSheetName = (name) => String(name || '').replace(/\u3000/g, ' ').trim();
 const isExcludedSheet = (name) => {
@@ -642,6 +714,11 @@ if (historySheet) {
     }
   }
   
+  const quitCountMap = buildQuitCountMap(ss);
+  Object.keys(userFullMap).forEach(uId => {
+    userFullMap[uId].quitCount = quitCountMap[uId] || 0;
+  });
+
   // ランキングデータに連続正解数を追加（詳細履歴ログから計算）
   // まず全てのユーザーに初期値0を設定
   Object.keys(userFullMap).forEach(uId => {
@@ -756,10 +833,26 @@ if (detailSheetSync) {
   result.maxStreak = 0;
 }
 
+const quitCountMapForSync = buildQuitCountMap(ss);
+result.quitCount = quitCountMapForSync[String(userId)] || 0;
+
 return returnJson(result);
 
 
 } catch (err) { return returnJson({ error: err.toString() }); }
+}
+
+function buildQuitCountMap(ss) {
+  const map = {};
+  const quitSheet = ss.getSheetByName("中断ログ");
+  if (!quitSheet) return map;
+  const values = quitSheet.getDataRange().getValues();
+  for (let i = 1; i < values.length; i++) {
+    const uId = String(values[i][6] || '').trim();
+    if (!uId) continue;
+    map[uId] = (map[uId] || 0) + 1;
+  }
+  return map;
 }
 
 function getOrCreateSheet(ss, name, headers) {
