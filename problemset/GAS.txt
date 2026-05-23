@@ -30,7 +30,7 @@ return returnJson({ error: "エラーが発生しました: " + err.toString() }
 // Apps Scriptで同名定数の重複宣言エラーを避けるため、設定はglobalThisに集約する
 var SCIENCE_EXP_CONFIG = globalThis.SCIENCE_EXP_CONFIG || {
   perSetPerfectCap: 5,
-  dailyGrantLimit: 2,
+  dailyGrantLimit: 3,
   disableExpCaps: true
 };
 globalThis.SCIENCE_EXP_CONFIG = SCIENCE_EXP_CONFIG;
@@ -40,7 +40,7 @@ globalThis.SCIENCE_EXP_CONFIG = SCIENCE_EXP_CONFIG;
 function readRuntimeConfigFromSheet(ss) {
   const defaults = {
     perSetPerfectCap: Number((globalThis.SCIENCE_EXP_CONFIG || {}).perSetPerfectCap) || 5,
-    dailyGrantLimit: Number((globalThis.SCIENCE_EXP_CONFIG || {}).dailyGrantLimit) || 2,
+    dailyGrantLimit: Number((globalThis.SCIENCE_EXP_CONFIG || {}).dailyGrantLimit) || 3,
     disableExpCaps: !!((globalThis.SCIENCE_EXP_CONFIG || {}).disableExpCaps),
     duplicateLogWindowSec: 60,
     appUrl: ""
@@ -249,7 +249,7 @@ try {
 
 const todayKey = Utilities.formatDate(now, "JST", "yyyy/MM/dd");
 const currentSetKey = buildSetKey(p.summaryEra, p.summaryRange);
-const dailyGrantLimit = Number(runtimeConfig.dailyGrantLimit) || 2;
+const dailyGrantLimit = Number(runtimeConfig.dailyGrantLimit) || 3;
 const disableExpCaps = !!runtimeConfig.disableExpCaps;
 
 let firstPerfectTimestampForCurrentSet = null;
@@ -286,7 +286,7 @@ let gainedExp = requestedExp;
 const expReasonParts = [];
 if (!disableExpCaps && firstPerfectTimestampForCurrentSet !== null && gainedExp > 0 && expGrantedAfterPerfectForCurrentSetToday >= dailyGrantLimit) {
   gainedExp = 0;
-  expReasonParts.push("満点到達済みセットのEXP加算は1日2回まで");
+  expReasonParts.push(`満点到達済みセットのEXP加算は1日${dailyGrantLimit}回まで`);
 }
 
 let lastCumulativeExp = 0;
@@ -496,7 +496,7 @@ const result = { problems: {}, userStats: {}, history: [], ranking: [], currentS
 result.config = {
   appUrl: runtimeConfig.appUrl || "",
   perSetPerfectCap: Number(runtimeConfig.perSetPerfectCap) || 5,
-  dailyGrantLimit: Number(runtimeConfig.dailyGrantLimit) || 2,
+  dailyGrantLimit: Number(runtimeConfig.dailyGrantLimit) || 3,
   disableExpCaps: !!runtimeConfig.disableExpCaps,
   duplicateLogWindowSec: Number(runtimeConfig.duplicateLogWindowSec) || 60
 };

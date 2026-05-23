@@ -71,7 +71,7 @@ GitHub Pagesは既に有効になっています。変更をプッシュする�
      appUrl    https://myo-n778.github.io/R8M2/problemset/science2.0.html
      disableExpCaps    true
      perSetPerfectCap    5
-     dailyGrantLimit    2
+     dailyGrantLimit    3
      duplicateLogWindowSec    60
      ```
 
