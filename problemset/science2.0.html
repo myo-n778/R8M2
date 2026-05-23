@@ -264,6 +264,16 @@
                     <button id="logout-btn" class="bg-white/10 text-white text-[10px] px-3 py-1 rounded-full border border-white/20 font-black italic cursor-pointer transition-all hover:opacity-80">LOGOUT</button>
                     <span id="last-attempt-display" class="bg-cyan-500/20 text-cyan-200 text-[9px] px-3 py-1 rounded-full border border-cyan-400/40 font-medium"></span>
                 </div>
+                <div id="announcement-banner" class="hidden mt-3 rounded-2xl border border-amber-300/30 bg-amber-400/10 px-4 py-3 text-left shadow-lg shadow-amber-500/10">
+                    <div class="flex items-start gap-3">
+                        <i class="fas fa-bullhorn text-amber-300 mt-0.5"></i>
+                        <div class="min-w-0">
+                            <p class="text-[8px] font-black uppercase text-amber-200/70 tracking-widest">Message from teacher</p>
+                            <p id="announcement-text" class="text-sm md:text-base font-bold text-amber-50 break-words"></p>
+                            <p id="announcement-updated-at" class="text-[9px] text-amber-100/50 mt-1"></p>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <div class="grid grid-cols-1 lg:grid-cols-3 xl:grid-cols-[minmax(0,2.2fr)_minmax(420px,1fr)] gap-4 md:gap-6 mt-0">
@@ -338,6 +348,50 @@
                                 <p class="text-[8px] text-white/35 uppercase font-black">Duplicate Guard</p>
                                 <p id="duplicate-window-display" class="text-[10px] text-emerald-300 font-bold">--</p>
                             </div>
+                        </div>
+                    </div>
+                    <div id="admin-panel" class="bg-black/20 border border-amber-500/20 rounded-xl p-3 space-y-4">
+                        <div class="flex items-center justify-between gap-2">
+                            <h3 class="text-xs font-black text-amber-300 uppercase italic flex items-center gap-2"><i class="fas fa-user-shield"></i> Admin Mode</h3>
+                            <span id="admin-status-display" class="text-[8px] text-white/40 uppercase font-black">locked</span>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-2">
+                            <input id="admin-key-input" type="password" autocomplete="off" class="w-full bg-black border border-slate-700 rounded p-2 text-[10px] text-amber-200 outline-none" placeholder="adminKey">
+                            <button id="admin-load-btn" class="bg-amber-500/20 text-amber-100 px-4 py-2 rounded-lg font-black uppercase text-[10px] border border-amber-400/30">Load</button>
+                        </div>
+                        <div class="space-y-2 border-t border-white/5 pt-3">
+                            <div class="flex items-center justify-between gap-2">
+                                <p class="text-[9px] text-white/40 uppercase font-black">Announcement</p>
+                                <label class="text-[9px] text-amber-100 flex items-center gap-2"><input id="announcement-enabled-input" type="checkbox" class="accent-amber-400"> enabled</label>
+                            </div>
+                            <textarea id="announcement-text-input" rows="2" maxlength="200" class="w-full bg-black border border-slate-700 rounded p-2 text-[10px] text-amber-100 outline-none resize-y" placeholder="生徒画面に表示する1行メッセージ"></textarea>
+                            <button id="announcement-save-btn" class="w-full bg-amber-500 text-slate-950 text-[10px] py-2 rounded-lg font-black uppercase">Save Message</button>
+                        </div>
+                        <div class="space-y-3 border-t border-white/5 pt-3">
+                            <p class="text-[9px] text-white/40 uppercase font-black">Runtime Settings</p>
+                            <label class="text-[9px] text-amber-100 flex items-center gap-2"><input id="admin-disable-exp-caps-input" type="checkbox" class="accent-amber-400"> EXPキャップをOFFにする</label>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                <label class="text-[9px] text-white/50 uppercase font-black">Daily Grant Limit<input id="admin-daily-grant-limit-input" type="number" min="0" step="1" class="mt-1 w-full bg-black border border-slate-700 rounded p-2 text-[10px] text-amber-100 outline-none" value="3"></label>
+                                <label class="text-[9px] text-white/50 uppercase font-black">Duplicate Guard Sec<input id="admin-duplicate-window-input" type="number" min="0" step="1" class="mt-1 w-full bg-black border border-slate-700 rounded p-2 text-[10px] text-emerald-100 outline-none" value="60"></label>
+                            </div>
+                            <div class="space-y-2">
+                                <div class="flex items-center justify-between gap-2">
+                                    <p class="text-[9px] text-white/40 uppercase font-black">Problem Visibility</p>
+                                    <span class="text-[8px] text-white/35">チェックあり=表示</span>
+                                </div>
+                                <div id="admin-problem-visibility-list" class="grid grid-cols-1 md:grid-cols-2 gap-1 max-h-44 overflow-y-auto bg-black/20 border border-white/5 rounded-lg p-2"></div>
+                            </div>
+                            <button id="admin-settings-save-btn" class="w-full bg-emerald-500 text-slate-950 text-[10px] py-2 rounded-lg font-black uppercase">Save Settings</button>
+                        </div>
+                        <div class="space-y-2 border-t border-white/5 pt-3">
+                            <p class="text-[9px] text-white/40 uppercase font-black">Merge User Records</p>
+                            <input id="merge-from-user-id" type="text" class="w-full bg-black border border-slate-700 rounded p-2 text-[10px] text-rose-200 outline-none" placeholder="統合元 userId 例: 菊-1-誤った名前">
+                            <input id="merge-to-user-id" type="text" class="w-full bg-black border border-slate-700 rounded p-2 text-[10px] text-emerald-200 outline-none" placeholder="統合先 userId 例: 菊-1-正しい名前">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                <button id="merge-dry-run-btn" class="bg-cyan-500/20 text-cyan-100 py-2 rounded-lg font-black uppercase text-[10px] border border-cyan-400/30">Dry Run</button>
+                                <button id="merge-apply-btn" class="bg-rose-600/30 text-rose-100 py-2 rounded-lg font-black uppercase text-[10px] border border-rose-400/40 disabled:opacity-30" disabled>Apply Checked Merge</button>
+                            </div>
+                            <pre id="merge-result-display" class="hidden whitespace-pre-wrap bg-black/50 border border-white/10 rounded-lg p-3 text-[10px] text-slate-200 max-h-40 overflow-y-auto"></pre>
                         </div>
                     </div>
                     <div id="sync-error-display" class="hidden"></div>
@@ -432,7 +486,7 @@
     <!-- スクリプト部分は以前のものを継続して使用 -->
     <script>
         const SHARED = window.ScienceShared || {};
-        const FIXED_GAS_URL = SHARED.gasUrl || "https://script.google.com/macros/s/AKfycbxVHNXfIvRHXY5VRbmR6U-TPhtsVkVq4w_B0kpk8mOM9d7jyl9FIHpJfNPGJIvH6nHwZQ/exec";
+        const FIXED_GAS_URL = SHARED.gasUrl || "https://script.google.com/macros/s/AKfycbzOWg0wS37iCzTz5-UAYXudBNmklcCAkMqTI1toPfbW8ZAepaAR6Ou4HmpZbqbXAHi7og/exec";
         const FIXED_SPREADSHEET_URL = "https://docs.google.com/spreadsheets/d/1LCGCVjeiTicyclXFTP0EaxxB_RluZJrveWPo1FdLzsk/edit";
         const IMAGE_MAP_URL = "./data/image-map.json";
         const normalizeUserName = SHARED.normalizeUserName || ((name) => name ? name.normalize('NFKC').trim() : '');
@@ -480,6 +534,7 @@
         let imageMapById = {};
         let imageMapLoadPromise = null;
         let quitCountState = 0;
+        let adminLastDryRun = null;
 
         // ステータスメッセージのリスト（20個）
         const STATUS_MESSAGES = [
@@ -563,6 +618,7 @@
 
         function updateRuntimeConfigUI(config) {
             runtimeConfigState = config || null;
+            updateAnnouncementBanner(config || null);
             const panel = getEl('runtime-config-panel');
             const urlDisplay = getEl('app-url-display');
             const openLink = getEl('app-url-open');
@@ -603,6 +659,25 @@
             duplicateEl.innerText = `${windowSec} sec`;
         }
 
+        function updateAnnouncementBanner(config) {
+            const banner = getEl('announcement-banner');
+            const textEl = getEl('announcement-text');
+            const updatedEl = getEl('announcement-updated-at');
+            if (!banner || !textEl || !updatedEl) return;
+            const enabled = !!(config && config.announcementEnabled);
+            const text = String((config && config.announcementText) || '').trim();
+            if (!enabled || !text) {
+                banner.classList.add('hidden');
+                textEl.innerText = '';
+                updatedEl.innerText = '';
+                return;
+            }
+            banner.classList.remove('hidden');
+            textEl.innerText = text;
+            const updatedAt = String(config.announcementUpdatedAt || '').trim();
+            updatedEl.innerText = updatedAt ? `updated: ${updatedAt}` : '';
+        }
+
         async function copyAppUrl() {
             const appUrl = String((runtimeConfigState && runtimeConfigState.appUrl) || '').trim();
             if (!appUrl) {
@@ -619,6 +694,196 @@
                 console.error('appUrl copy failed:', e);
             }
             showModal("App URL", appUrl);
+        }
+
+        function getSpreadsheetIdFromInput() {
+            const urlInput = getEl('main-spreadsheet-url');
+            const spreadsheetUrl = urlInput && urlInput.value ? urlInput.value : FIXED_SPREADSHEET_URL;
+            return spreadsheetUrl.match(/\/d\/([a-zA-Z0-9-_]+)/)?.[1] || '';
+        }
+
+        function getCurrentUserIdLabel() {
+            if (USER_CLASS && USER_NUMBER && USER_NAME) return `${USER_CLASS}-${USER_NUMBER}-${USER_NAME}`;
+            return USER_NAME || 'admin';
+        }
+
+        function getAdminKey() {
+            const input = getEl('admin-key-input');
+            return input ? input.value.trim() : '';
+        }
+
+        function setAdminStatus(text, tone = 'neutral') {
+            const el = getEl('admin-status-display');
+            if (!el) return;
+            el.innerText = text;
+            el.classList.remove('text-emerald-300', 'text-rose-300', 'text-white/40');
+            if (tone === 'success') el.classList.add('text-emerald-300');
+            else if (tone === 'error') el.classList.add('text-rose-300');
+            else el.classList.add('text-white/40');
+        }
+
+        function setMergeResult(data) {
+            const resultEl = getEl('merge-result-display');
+            if (!resultEl) return;
+            resultEl.classList.remove('hidden');
+            resultEl.textContent = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
+        }
+
+        function renderAdminSettings(settings = {}, problemSheets = []) {
+            const disableExpCapsInput = getEl('admin-disable-exp-caps-input');
+            const dailyGrantInput = getEl('admin-daily-grant-limit-input');
+            const duplicateInput = getEl('admin-duplicate-window-input');
+            const visibilityList = getEl('admin-problem-visibility-list');
+            if (disableExpCapsInput) disableExpCapsInput.checked = !!settings.disableExpCaps;
+            if (dailyGrantInput) dailyGrantInput.value = String(Number(settings.dailyGrantLimit) || 3);
+            if (duplicateInput) duplicateInput.value = String(Number(settings.duplicateLogWindowSec) || 60);
+            if (!visibilityList) return;
+            visibilityList.innerHTML = '';
+            if (!Array.isArray(problemSheets) || problemSheets.length === 0) {
+                visibilityList.innerHTML = '<p class="text-[10px] text-white/40">問題シートが見つかりません。</p>';
+                return;
+            }
+            problemSheets.forEach((sheet) => {
+                const label = document.createElement('label');
+                label.className = 'flex items-center gap-2 text-[10px] text-slate-100 bg-white/5 rounded px-2 py-1 border border-white/5';
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.className = 'admin-problem-visible-checkbox accent-emerald-400';
+                checkbox.dataset.sheetName = sheet.name;
+                checkbox.checked = !!sheet.visible;
+                const span = document.createElement('span');
+                span.className = 'truncate';
+                span.textContent = sheet.name;
+                label.appendChild(checkbox);
+                label.appendChild(span);
+                visibilityList.appendChild(label);
+            });
+        }
+
+        function collectHiddenProblemSheetsFromAdmin() {
+            return Array.from(document.querySelectorAll('.admin-problem-visible-checkbox'))
+                .filter((checkbox) => !checkbox.checked)
+                .map((checkbox) => checkbox.dataset.sheetName || '')
+                .filter((name) => !!name);
+        }
+
+        async function callAdminAction(action, params = {}) {
+            const sid = getSpreadsheetIdFromInput();
+            if (!sid) throw new Error('スプレッドシートURLが正しくありません。');
+            const payload = {
+                action,
+                spreadsheetId: sid,
+                adminKey: getAdminKey(),
+                requestedBy: getCurrentUserIdLabel(),
+                ...params
+            };
+            return fetchWithRetry(`${FIXED_GAS_URL}?${new URLSearchParams(payload).toString()}`);
+        }
+
+        async function loadAdminStatus() {
+            try {
+                const result = await callAdminAction('getAdminStatus');
+                if (result.status !== 'success') throw new Error(result.message || '管理者状態の取得に失敗しました。');
+                if (!result.adminEnabled) {
+                    setAdminStatus('adminKey missing', 'error');
+                } else if (result.authorized) {
+                    setAdminStatus('unlocked', 'success');
+                } else {
+                    setAdminStatus('locked', 'error');
+                }
+                const announcement = result.announcement || {};
+                const enabledInput = getEl('announcement-enabled-input');
+                const textInput = getEl('announcement-text-input');
+                if (enabledInput) enabledInput.checked = !!announcement.enabled;
+                if (textInput) textInput.value = announcement.text || '';
+                renderAdminSettings(result.settings || {}, result.problemSheets || []);
+                if (result.authMessage && !result.authorized) setMergeResult(result.authMessage);
+            } catch (error) {
+                setAdminStatus('error', 'error');
+                setMergeResult(error.message || String(error));
+            }
+        }
+
+        async function saveAnnouncementFromAdmin() {
+            try {
+                const enabledInput = getEl('announcement-enabled-input');
+                const textInput = getEl('announcement-text-input');
+                const result = await callAdminAction('updateAnnouncement', {
+                    enabled: enabledInput && enabledInput.checked ? 'true' : 'false',
+                    text: textInput ? textInput.value.trim() : ''
+                });
+                if (result.status !== 'success') throw new Error(result.message || 'メッセージ保存に失敗しました。');
+                setAdminStatus('saved', 'success');
+                updateAnnouncementBanner({
+                    announcementEnabled: result.announcement && result.announcement.enabled,
+                    announcementText: result.announcement && result.announcement.text,
+                    announcementUpdatedAt: result.announcement && result.announcement.updatedAt
+                });
+                await window.syncAllFromSpreadsheet(true);
+            } catch (error) {
+                setAdminStatus('error', 'error');
+                setMergeResult(error.message || String(error));
+            }
+        }
+
+        async function saveAdminSettings() {
+            try {
+                const disableExpCapsInput = getEl('admin-disable-exp-caps-input');
+                const dailyGrantInput = getEl('admin-daily-grant-limit-input');
+                const duplicateInput = getEl('admin-duplicate-window-input');
+                const hiddenProblemSheets = collectHiddenProblemSheetsFromAdmin();
+                const result = await callAdminAction('updateAdminSettings', {
+                    disableExpCaps: disableExpCapsInput && disableExpCapsInput.checked ? 'true' : 'false',
+                    dailyGrantLimit: dailyGrantInput ? dailyGrantInput.value : '3',
+                    duplicateLogWindowSec: duplicateInput ? duplicateInput.value : '60',
+                    hiddenProblemSheets: hiddenProblemSheets.join(',')
+                });
+                if (result.status !== 'success') throw new Error(result.message || '設定保存に失敗しました。');
+                setAdminStatus('settings saved', 'success');
+                renderAdminSettings(result.settings || {}, result.problemSheets || []);
+                await window.syncAllFromSpreadsheet(true);
+            } catch (error) {
+                setAdminStatus('error', 'error');
+                setMergeResult(error.message || String(error));
+            }
+        }
+
+        async function runMergeDryRun() {
+            try {
+                adminLastDryRun = null;
+                const applyBtn = getEl('merge-apply-btn');
+                if (applyBtn) applyBtn.disabled = true;
+                const fromUserId = (getEl('merge-from-user-id')?.value || '').trim();
+                const toUserId = (getEl('merge-to-user-id')?.value || '').trim();
+                const result = await callAdminAction('mergeUserDryRun', { fromUserId, toUserId });
+                if (result.status !== 'success') throw new Error(result.message || 'dry-runに失敗しました。');
+                adminLastDryRun = { fromUserId, toUserId, totalRows: Number(result.totalRows) || 0 };
+                setMergeResult(result);
+                if (applyBtn) applyBtn.disabled = adminLastDryRun.totalRows <= 0;
+            } catch (error) {
+                setMergeResult(error.message || String(error));
+            }
+        }
+
+        async function applyCheckedMerge() {
+            try {
+                const fromUserId = (getEl('merge-from-user-id')?.value || '').trim();
+                const toUserId = (getEl('merge-to-user-id')?.value || '').trim();
+                if (!adminLastDryRun || adminLastDryRun.fromUserId !== fromUserId || adminLastDryRun.toUserId !== toUserId || adminLastDryRun.totalRows <= 0) {
+                    throw new Error('先に同じ統合元・統合先でdry-runを実行してください。');
+                }
+                const ok = confirm(`成績統合を実行します。\n\n${fromUserId}\n→ ${toUserId}\n\n対象行数: ${adminLastDryRun.totalRows}\nこの操作はスプレッドシートを書き換えます。`);
+                if (!ok) return;
+                const result = await callAdminAction('mergeUserApply', { fromUserId, toUserId });
+                if (result.status !== 'success') throw new Error(result.message || '統合に失敗しました。');
+                adminLastDryRun = null;
+                const applyBtn = getEl('merge-apply-btn');
+                if (applyBtn) applyBtn.disabled = true;
+                setMergeResult(result);
+                await window.syncAllFromSpreadsheet(true);
+            } catch (error) {
+                setMergeResult(error.message || String(error));
+            }
         }
 
         // KaTeX数式レンダリング関数（より確実な方法）
@@ -930,7 +1195,7 @@
         function isSystemOrConfigSheetName(name) {
             const normalized = String(name || '').replace(/\u3000/g, ' ').trim();
             if (!normalized) return true;
-            const exactNames = new Set(['履歴ログ', '詳細履歴ログ', '問題別統計DB', '成績一覧', 'メンバー一覧', '設定', '画像管理', '中断ログ']);
+            const exactNames = new Set(['履歴ログ', '詳細履歴ログ', '問題別統計DB', '成績一覧', 'メンバー一覧', '設定', '画像管理', '中断ログ', '管理操作', '管理ログ']);
             if (exactNames.has(normalized)) return true;
             const lower = normalized.toLowerCase();
             return ['config', 'settings', '_config', '_settings'].includes(lower);
@@ -2729,6 +2994,21 @@
             setOnClick('sync-all-btn-action', () => window.syncAllFromSpreadsheet(false)); 
             setOnClick('cloud-sync-toggle-btn', () => { const area = getEl('sync-area'); if (area) area.classList.toggle('hidden'); }); 
             setOnClick('app-url-copy-btn', copyAppUrl);
+            setOnClick('admin-load-btn', loadAdminStatus);
+            setOnClick('announcement-save-btn', saveAnnouncementFromAdmin);
+            setOnClick('admin-settings-save-btn', saveAdminSettings);
+            setOnClick('merge-dry-run-btn', runMergeDryRun);
+            setOnClick('merge-apply-btn', applyCheckedMerge);
+            ['merge-from-user-id', 'merge-to-user-id'].forEach((id) => {
+                const el = getEl(id);
+                if (el) {
+                    el.addEventListener('input', () => {
+                        adminLastDryRun = null;
+                        const applyBtn = getEl('merge-apply-btn');
+                        if (applyBtn) applyBtn.disabled = true;
+                    });
+                }
+            });
         };
     </script>
 </body>

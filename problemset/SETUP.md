@@ -5,7 +5,7 @@
 GitHub Pagesで公開する場合、以下のURLでアクセスできます：
 
 - メインページ: https://myo-n778.github.io/R8M2/
-- 直接アクセス: https://myo-n778.github.io/R8M2/science2.0.html
+- 直接アクセス: https://myo-n778.github.io/R8M2/problemset/science2.0.html
 
 GitHub Pagesは既に有効になっています。変更をプッシュすると、数分で反映されます。
 
@@ -66,6 +66,11 @@ GitHub Pagesは既に有効になっています。変更をプッシュする�
      - `perSetPerfectCap`
      - `dailyGrantLimit`
      - `duplicateLogWindowSec`
+     - `announcementEnabled`
+     - `announcementText`
+     - `announcementUpdatedAt`
+     - `adminKey`
+     - `hiddenProblemSheets`
    - 例：
      ```
      appUrl    https://myo-n778.github.io/R8M2/problemset/science2.0.html
@@ -73,6 +78,10 @@ GitHub Pagesは既に有効になっています。変更をプッシュする�
      perSetPerfectCap    5
      dailyGrantLimit    3
      duplicateLogWindowSec    60
+     announcementEnabled    false
+     announcementText    
+     adminKey    任意の管理者キー
+     hiddenProblemSheets    
      ```
 
 ### 3. HTMLファイルの設定確認
@@ -80,7 +89,7 @@ GitHub Pagesは既に有効になっています。変更をプッシュする�
 `science2.0.html` の以下の設定を確認：
 
 ```javascript
-const FIXED_GAS_URL = "https://script.google.com/macros/s/AKfycbxVHNXfIvRHXY5VRbmR6U-TPhtsVkVq4w_B0kpk8mOM9d7jyl9FIHpJfNPGJIvH6nHwZQ/exec";
+const FIXED_GAS_URL = "https://script.google.com/macros/s/AKfycbzOWg0wS37iCzTz5-UAYXudBNmklcCAkMqTI1toPfbW8ZAepaAR6Ou4HmpZbqbXAHi7og/exec";
 const FIXED_SPREADSHEET_URL = "https://docs.google.com/spreadsheets/d/1LCGCVjeiTicyclXFTP0EaxxB_RluZJrveWPo1FdLzsk/edit";
 ```
 

@@ -15,6 +15,11 @@ if (action === 'logAll') return handleLogAll(e.parameter);
 if (action === 'logQuit') return handleLogQuit(e.parameter);
 if (action === 'updateStatus') return handleUpdateStatus(e.parameter);
 if (action === 'detectDuplicates') return handleDetectDuplicates(e.parameter);
+if (action === 'getAdminStatus') return handleGetAdminStatus(e.parameter);
+if (action === 'updateAnnouncement') return handleUpdateAnnouncement(e.parameter);
+if (action === 'updateAdminSettings') return handleUpdateAdminSettings(e.parameter);
+if (action === 'mergeUserDryRun') return handleMergeUser(e.parameter, false);
+if (action === 'mergeUserApply') return handleMergeUser(e.parameter, true);
 // syncアクションの場合
 const ssId = e.parameter.id;
 const userId = e.parameter.userId || '';
@@ -43,7 +48,12 @@ function readRuntimeConfigFromSheet(ss) {
     dailyGrantLimit: Number((globalThis.SCIENCE_EXP_CONFIG || {}).dailyGrantLimit) || 3,
     disableExpCaps: !!((globalThis.SCIENCE_EXP_CONFIG || {}).disableExpCaps),
     duplicateLogWindowSec: 60,
-    appUrl: ""
+    appUrl: "",
+    announcementEnabled: false,
+    announcementText: "",
+    announcementUpdatedAt: "",
+    adminKey: "",
+    hiddenProblemSheets: []
   };
   try {
     const configSheet = ss.getSheetByName("設定");
@@ -71,12 +81,22 @@ function readRuntimeConfigFromSheet(ss) {
       const s = String(v || '').trim();
       return s === '' ? fallback : s;
     };
+    const parseList = function(v, fallback) {
+      const s = String(v || '').trim();
+      if (!s) return fallback || [];
+      return s.split(/[\n,、]/).map(function(item) { return String(item || '').trim(); }).filter(function(item) { return !!item; });
+    };
     return {
       perSetPerfectCap: parseNum(map.perSetPerfectCap, defaults.perSetPerfectCap),
       dailyGrantLimit: parseNum(map.dailyGrantLimit, defaults.dailyGrantLimit),
       disableExpCaps: parseBool(map.disableExpCaps, defaults.disableExpCaps),
       duplicateLogWindowSec: parseNum(map.duplicateLogWindowSec, defaults.duplicateLogWindowSec),
-      appUrl: parseText(map.appUrl || map.problemUrl, defaults.appUrl)
+      appUrl: parseText(map.appUrl || map.problemUrl, defaults.appUrl),
+      announcementEnabled: parseBool(map.announcementEnabled, defaults.announcementEnabled),
+      announcementText: parseText(map.announcementText, defaults.announcementText),
+      announcementUpdatedAt: parseText(map.announcementUpdatedAt, defaults.announcementUpdatedAt),
+      adminKey: parseText(map.adminKey, defaults.adminKey),
+      hiddenProblemSheets: parseList(map.hiddenProblemSheets, defaults.hiddenProblemSheets)
     };
   } catch (e) {
     // 設定シート不備では処理を止めず、既定値で継続する
@@ -498,17 +518,27 @@ result.config = {
   perSetPerfectCap: Number(runtimeConfig.perSetPerfectCap) || 5,
   dailyGrantLimit: Number(runtimeConfig.dailyGrantLimit) || 3,
   disableExpCaps: !!runtimeConfig.disableExpCaps,
-  duplicateLogWindowSec: Number(runtimeConfig.duplicateLogWindowSec) || 60
+  duplicateLogWindowSec: Number(runtimeConfig.duplicateLogWindowSec) || 60,
+  announcementEnabled: !!runtimeConfig.announcementEnabled,
+  announcementText: runtimeConfig.announcementText || "",
+  announcementUpdatedAt: runtimeConfig.announcementUpdatedAt || "",
+  hiddenProblemSheets: runtimeConfig.hiddenProblemSheets || []
 };
 result.imageMap = readImageMapFromSheet(ss);
 
 // システム用シートを除外するリスト
-const excludeSheets = ["履歴ログ", "詳細履歴ログ", "問題別統計DB", "成績一覧", "メンバー一覧", "設定", "画像管理", "中断ログ"];
+const excludeSheets = ["履歴ログ", "詳細履歴ログ", "問題別統計DB", "成績一覧", "メンバー一覧", "設定", "画像管理", "中断ログ", "管理操作", "管理ログ"];
 const excludeSheetAliases = ["config", "settings", "_config", "_settings"];
 const normalizeSheetName = (name) => String(name || '').replace(/\u3000/g, ' ').trim();
+const hiddenProblemSheetSet = {};
+(runtimeConfig.hiddenProblemSheets || []).forEach(function(name) {
+  const normalized = normalizeSheetName(name);
+  if (normalized) hiddenProblemSheetSet[normalized] = true;
+});
 const isExcludedSheet = (name) => {
   const normalized = normalizeSheetName(name);
   if (excludeSheets.includes(normalized)) return true;
+  if (hiddenProblemSheetSet[normalized]) return true;
   const lower = normalized.toLowerCase();
   if (excludeSheetAliases.includes(lower)) return true;
   return false;
@@ -877,6 +907,393 @@ if (!sheet) {
   }
 }
 return sheet;
+}
+
+function ensureAdminAuthorized(ss, providedKey) {
+  const runtimeConfig = readRuntimeConfigFromSheet(ss);
+  const configuredKey = String(runtimeConfig.adminKey || '').trim();
+  const inputKey = String(providedKey || '').trim();
+  if (!configuredKey) {
+    return { ok: false, message: "設定シートに adminKey が未設定です。管理者操作を有効にするには adminKey を設定してください。" };
+  }
+  if (!inputKey || inputKey !== configuredKey) {
+    return { ok: false, message: "管理者キーが一致しません。" };
+  }
+  return { ok: true, config: runtimeConfig };
+}
+
+function getSpreadsheetFromAdminParams(p) {
+  const spreadsheetId = p.spreadsheetId || p.id || '';
+  if (!spreadsheetId || spreadsheetId.trim() === '') {
+    return { error: "スプレッドシートIDが指定されていません" };
+  }
+  try {
+    return { ss: SpreadsheetApp.openById(spreadsheetId) };
+  } catch (openError) {
+    return { error: "スプレッドシートが見つかりません: " + openError.toString() };
+  }
+}
+
+function upsertConfigValue(ss, key, value) {
+  let sheet = ss.getSheetByName("設定");
+  if (!sheet) {
+    sheet = ss.insertSheet("設定");
+    sheet.getRange(1, 1, 1, 2).setValues([["key", "value"]]);
+    sheet.getRange(1, 1, 1, 2).setBackground("#f3f3f3").setFontWeight("bold");
+    sheet.setFrozenRows(1);
+  }
+  const values = sheet.getDataRange().getDisplayValues();
+  for (let i = 0; i < values.length; i++) {
+    if (String(values[i][0] || '').trim() === key) {
+      sheet.getRange(i + 1, 2).setValue(value);
+      return;
+    }
+  }
+  sheet.appendRow([key, value]);
+}
+
+function parseUserIdParts(userId) {
+  const parts = String(userId || '').split('-');
+  return {
+    userClass: String(parts[0] || '').trim(),
+    userNumber: String(parts[1] || '').trim(),
+    userName: parts.slice(2).join('-').trim()
+  };
+}
+
+function listProblemSheetStatus(ss, runtimeConfig) {
+  const systemSheets = ["履歴ログ", "詳細履歴ログ", "問題別統計DB", "成績一覧", "メンバー一覧", "設定", "画像管理", "中断ログ", "管理操作", "管理ログ"];
+  const systemAliases = ["config", "settings", "_config", "_settings"];
+  const normalize = function(name) { return String(name || '').replace(/\u3000/g, ' ').trim(); };
+  const hiddenSet = {};
+  (runtimeConfig.hiddenProblemSheets || []).forEach(function(name) {
+    const normalized = normalize(name);
+    if (normalized) hiddenSet[normalized] = true;
+  });
+  return ss.getSheets().map(function(sheet) {
+    const name = sheet.getName();
+    const normalized = normalize(name);
+    const isSystem = systemSheets.indexOf(normalized) >= 0 || systemAliases.indexOf(normalized.toLowerCase()) >= 0;
+    if (isSystem) return null;
+    return {
+      name: name,
+      visible: !hiddenSet[normalized]
+    };
+  }).filter(function(entry) { return !!entry; });
+}
+
+function handleGetAdminStatus(p) {
+  try {
+    const opened = getSpreadsheetFromAdminParams(p);
+    if (opened.error) return returnJson({ status: "error", message: opened.error });
+    const ss = opened.ss;
+    const runtimeConfig = readRuntimeConfigFromSheet(ss);
+    const auth = ensureAdminAuthorized(ss, p.adminKey);
+    return returnJson({
+      status: "success",
+      adminEnabled: !!runtimeConfig.adminKey,
+      authorized: !!auth.ok,
+      authMessage: auth.ok ? "" : auth.message,
+      announcement: {
+        enabled: !!runtimeConfig.announcementEnabled,
+        text: runtimeConfig.announcementText || "",
+        updatedAt: runtimeConfig.announcementUpdatedAt || ""
+      },
+      settings: {
+        disableExpCaps: !!runtimeConfig.disableExpCaps,
+        perSetPerfectCap: Number(runtimeConfig.perSetPerfectCap) || 5,
+        dailyGrantLimit: Number(runtimeConfig.dailyGrantLimit) || 3,
+        duplicateLogWindowSec: Number(runtimeConfig.duplicateLogWindowSec) || 60,
+        hiddenProblemSheets: runtimeConfig.hiddenProblemSheets || []
+      },
+      problemSheets: listProblemSheetStatus(ss, runtimeConfig)
+    });
+  } catch (err) {
+    return returnJson({ status: "error", message: err.toString() });
+  }
+}
+
+function handleUpdateAnnouncement(p) {
+  let adminLock = null;
+  try {
+    const opened = getSpreadsheetFromAdminParams(p);
+    if (opened.error) return returnJson({ status: "error", message: opened.error });
+    const ss = opened.ss;
+    const auth = ensureAdminAuthorized(ss, p.adminKey);
+    if (!auth.ok) return returnJson({ status: "error", message: auth.message });
+    adminLock = LockService.getScriptLock();
+    adminLock.waitLock(10000);
+    const enabled = toBoolParam(p.enabled, false);
+    const text = String(p.text || '').trim().slice(0, 200);
+    const updatedAt = Utilities.formatDate(new Date(), "JST", "yyyy/MM/dd HH:mm:ss");
+    upsertConfigValue(ss, "announcementEnabled", enabled ? "true" : "false");
+    upsertConfigValue(ss, "announcementText", text);
+    upsertConfigValue(ss, "announcementUpdatedAt", updatedAt);
+    appendAdminLog(ss, "updateAnnouncement", p.requestedBy || "", "", "", "success", `enabled=${enabled}; length=${text.length}`);
+    return returnJson({ status: "success", announcement: { enabled: enabled, text: text, updatedAt: updatedAt } });
+  } catch (err) {
+    return returnJson({ status: "error", message: err.toString() });
+  } finally {
+    if (adminLock) {
+      try { adminLock.releaseLock(); } catch (releaseError) { console.error("管理者ロック解放エラー:", releaseError); }
+    }
+  }
+}
+
+function handleUpdateAdminSettings(p) {
+  let adminLock = null;
+  try {
+    const opened = getSpreadsheetFromAdminParams(p);
+    if (opened.error) return returnJson({ status: "error", message: opened.error });
+    const ss = opened.ss;
+    const auth = ensureAdminAuthorized(ss, p.adminKey);
+    if (!auth.ok) return returnJson({ status: "error", message: auth.message });
+    adminLock = LockService.getScriptLock();
+    adminLock.waitLock(10000);
+    const disableExpCaps = toBoolParam(p.disableExpCaps, true);
+    const dailyGrantLimit = Math.max(0, parseInt(p.dailyGrantLimit, 10) || 0);
+    const duplicateLogWindowSec = Math.max(0, parseInt(p.duplicateLogWindowSec, 10) || 60);
+    const hiddenProblemSheets = String(p.hiddenProblemSheets || '').split(/[\n,、]/).map(function(item) {
+      return String(item || '').trim();
+    }).filter(function(item) { return !!item; });
+    upsertConfigValue(ss, "disableExpCaps", disableExpCaps ? "true" : "false");
+    upsertConfigValue(ss, "dailyGrantLimit", String(dailyGrantLimit));
+    upsertConfigValue(ss, "duplicateLogWindowSec", String(duplicateLogWindowSec));
+    upsertConfigValue(ss, "hiddenProblemSheets", hiddenProblemSheets.join(","));
+    const runtimeConfig = readRuntimeConfigFromSheet(ss);
+    appendAdminLog(ss, "updateAdminSettings", p.requestedBy || "", "", "", "success", `disableExpCaps=${disableExpCaps}; dailyGrantLimit=${dailyGrantLimit}; hidden=${hiddenProblemSheets.join(",")}`);
+    return returnJson({
+      status: "success",
+      settings: {
+        disableExpCaps: !!runtimeConfig.disableExpCaps,
+        perSetPerfectCap: Number(runtimeConfig.perSetPerfectCap) || 5,
+        dailyGrantLimit: Number(runtimeConfig.dailyGrantLimit) || 3,
+        duplicateLogWindowSec: Number(runtimeConfig.duplicateLogWindowSec) || 60,
+        hiddenProblemSheets: runtimeConfig.hiddenProblemSheets || []
+      },
+      problemSheets: listProblemSheetStatus(ss, runtimeConfig)
+    });
+  } catch (err) {
+    return returnJson({ status: "error", message: err.toString() });
+  } finally {
+    if (adminLock) {
+      try { adminLock.releaseLock(); } catch (releaseError) { console.error("管理者ロック解放エラー:", releaseError); }
+    }
+  }
+}
+
+function appendAdminLog(ss, action, requestedBy, fromUserId, toUserId, status, result) {
+  const sheet = getOrCreateSheet(ss, "管理ログ", ["日時", "操作", "実行者", "統合元ユーザーID", "統合先ユーザーID", "状態", "結果"]);
+  const timestampStr = Utilities.formatDate(new Date(), "JST", "yyyy/MM/dd HH:mm:ss");
+  sheet.appendRow([timestampStr, action, requestedBy || "", fromUserId || "", toUserId || "", status || "", result || ""]);
+}
+
+function countMergeTargets(ss, fromUserId) {
+  const targets = [
+    { name: "履歴ログ", userIdIndex: 6 },
+    { name: "詳細履歴ログ", userIdIndex: 6 },
+    { name: "問題別統計DB", userIdIndex: 8 },
+    { name: "中断ログ", userIdIndex: 6 }
+  ];
+  const counts = {};
+  let total = 0;
+  targets.forEach(function(target) {
+    const sheet = ss.getSheetByName(target.name);
+    let count = 0;
+    if (sheet) {
+      const values = sheet.getDataRange().getValues();
+      for (let i = 1; i < values.length; i++) {
+        if (String(values[i][target.userIdIndex] || '').trim() === String(fromUserId)) count++;
+      }
+    }
+    counts[target.name] = count;
+    total += count;
+  });
+  return { total: total, counts: counts };
+}
+
+function handleMergeUser(p, applyMode) {
+  let adminLock = null;
+  try {
+    const opened = getSpreadsheetFromAdminParams(p);
+    if (opened.error) return returnJson({ status: "error", message: opened.error });
+    const ss = opened.ss;
+    const auth = ensureAdminAuthorized(ss, p.adminKey);
+    if (!auth.ok) return returnJson({ status: "error", message: auth.message });
+
+    const fromUserId = String(p.fromUserId || '').trim();
+    const toUserId = String(p.toUserId || '').trim();
+    if (!fromUserId || !toUserId) return returnJson({ status: "error", message: "統合元と統合先のユーザーIDが必要です。" });
+    if (fromUserId === toUserId) return returnJson({ status: "error", message: "統合元と統合先が同じです。" });
+    const toParts = parseUserIdParts(toUserId);
+    if (!toParts.userClass || !toParts.userNumber || !toParts.userName) {
+      return returnJson({ status: "error", message: "統合先ユーザーIDは「クラス-番号-名前」の形式にしてください。" });
+    }
+
+    const dryRun = countMergeTargets(ss, fromUserId);
+    if (!applyMode) {
+      return returnJson({ status: "success", mode: "dry-run", fromUserId: fromUserId, toUserId: toUserId, totalRows: dryRun.total, sheetCounts: dryRun.counts });
+    }
+    if (dryRun.total <= 0) {
+      return returnJson({ status: "error", message: "統合元ユーザーIDに一致する記録がありません。", mode: "apply", sheetCounts: dryRun.counts });
+    }
+
+    adminLock = LockService.getScriptLock();
+    adminLock.waitLock(10000);
+    const applyResult = applyUserMerge(ss, fromUserId, toUserId, toParts);
+    appendAdminOperation(ss, fromUserId, toUserId, "apply", p.requestedBy || "", "success", JSON.stringify(applyResult.counts));
+    appendAdminLog(ss, "mergeUserApply", p.requestedBy || "", fromUserId, toUserId, "success", JSON.stringify(applyResult.counts));
+    return returnJson({
+      status: "success",
+      mode: "apply",
+      fromUserId: fromUserId,
+      toUserId: toUserId,
+      totalRows: applyResult.total,
+      sheetCounts: applyResult.counts,
+      statsMergedRows: applyResult.statsMergedRows
+    });
+  } catch (err) {
+    return returnJson({ status: "error", message: err.toString() });
+  } finally {
+    if (adminLock) {
+      try { adminLock.releaseLock(); } catch (releaseError) { console.error("管理者ロック解放エラー:", releaseError); }
+    }
+  }
+}
+
+function appendAdminOperation(ss, fromUserId, toUserId, mode, requestedBy, status, result) {
+  const sheet = getOrCreateSheet(ss, "管理操作", ["日時", "mode", "requestedBy", "fromUserId", "toUserId", "status", "result", "executedAt"]);
+  const timestampStr = Utilities.formatDate(new Date(), "JST", "yyyy/MM/dd HH:mm:ss");
+  sheet.appendRow([timestampStr, mode || "", requestedBy || "", fromUserId || "", toUserId || "", status || "", result || "", timestampStr]);
+}
+
+function applyUserMerge(ss, fromUserId, toUserId, toParts) {
+  const counts = { "履歴ログ": 0, "詳細履歴ログ": 0, "問題別統計DB": 0, "中断ログ": 0 };
+  const historySheet = ss.getSheetByName("履歴ログ");
+  if (historySheet) {
+    const data = historySheet.getDataRange().getValues();
+    for (let i = 1; i < data.length; i++) {
+      if (String(data[i][6] || '').trim() === fromUserId) {
+        historySheet.getRange(i + 1, 6).setValue(toParts.userName);
+        historySheet.getRange(i + 1, 7).setValue(toUserId);
+        historySheet.getRange(i + 1, 8).setValue(toParts.userClass);
+        historySheet.getRange(i + 1, 9).setValue(toParts.userNumber);
+        counts["履歴ログ"]++;
+      }
+    }
+  }
+
+  const detailSheet = ss.getSheetByName("詳細履歴ログ");
+  if (detailSheet) {
+    const data = detailSheet.getDataRange().getValues();
+    for (let i = 1; i < data.length; i++) {
+      if (String(data[i][6] || '').trim() === fromUserId) {
+        detailSheet.getRange(i + 1, 6).setValue(toParts.userName);
+        detailSheet.getRange(i + 1, 7).setValue(toUserId);
+        counts["詳細履歴ログ"]++;
+      }
+    }
+  }
+
+  const statsSheet = ss.getSheetByName("問題別統計DB");
+  if (statsSheet) {
+    const data = statsSheet.getDataRange().getValues();
+    for (let i = 1; i < data.length; i++) {
+      if (String(data[i][8] || '').trim() === fromUserId) {
+        statsSheet.getRange(i + 1, 8).setValue(toParts.userName);
+        statsSheet.getRange(i + 1, 9).setValue(toUserId);
+        counts["問題別統計DB"]++;
+      }
+    }
+  }
+
+  const quitSheet = ss.getSheetByName("中断ログ");
+  if (quitSheet) {
+    const data = quitSheet.getDataRange().getValues();
+    for (let i = 1; i < data.length; i++) {
+      if (String(data[i][6] || '').trim() === fromUserId) {
+        quitSheet.getRange(i + 1, 6).setValue(toParts.userName);
+        quitSheet.getRange(i + 1, 7).setValue(toUserId);
+        quitSheet.getRange(i + 1, 8).setValue(toParts.userClass);
+        quitSheet.getRange(i + 1, 9).setValue(toParts.userNumber);
+        counts["中断ログ"]++;
+      }
+    }
+  }
+
+  const statsMergedRows = consolidateStatsRowsForUser(ss, toUserId, toParts.userName);
+  recalculateUserHistoryDerivedColumns(ss, toUserId);
+  if (historySheet) {
+    const hData = historySheet.getDataRange().getValues();
+    recalculateStreaks(ss, historySheet, hData);
+  }
+  updateOverallSummarySheet(ss);
+  return { counts: counts, total: Object.keys(counts).reduce(function(sum, key) { return sum + counts[key]; }, 0), statsMergedRows: statsMergedRows };
+}
+
+function consolidateStatsRowsForUser(ss, userId, userName) {
+  const sheet = ss.getSheetByName("問題別統計DB");
+  if (!sheet) return 0;
+  const data = sheet.getDataRange().getValues();
+  const groups = {};
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][8] || '').trim() !== userId) continue;
+    const key = String(data[i][0] || '').trim() + "::" + String(data[i][1] || '').trim();
+    if (!groups[key]) groups[key] = [];
+    groups[key].push({ rowNumber: i + 1, row: data[i] });
+  }
+  let deleted = 0;
+  Object.keys(groups).forEach(function(key) {
+    const rows = groups[key];
+    if (rows.length === 0) return;
+    let total = 0;
+    let correct = 0;
+    let latestDate = "";
+    rows.forEach(function(item) {
+      total += parseInt(item.row[2]) || 0;
+      correct += parseInt(item.row[3]) || 0;
+      const rowDate = String(item.row[5] || '').trim();
+      if (rowDate && rowDate > latestDate) latestDate = rowDate;
+    });
+    const keep = rows[0];
+    const accuracy = total > 0 ? Math.round((correct / total) * 100) + "%" : "0%";
+    sheet.getRange(keep.rowNumber, 1, 1, 9).setValues([[keep.row[0], keep.row[1], total, correct, accuracy, latestDate, 0, userName, userId]]);
+    rows.slice(1).sort(function(a, b) { return b.rowNumber - a.rowNumber; }).forEach(function(item) {
+      sheet.deleteRow(item.rowNumber);
+      deleted++;
+    });
+  });
+  return deleted;
+}
+
+function recalculateUserHistoryDerivedColumns(ss, userId) {
+  const sheet = ss.getSheetByName("履歴ログ");
+  if (!sheet) return;
+  const data = sheet.getDataRange().getValues();
+  const rows = [];
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][6] || '').trim() === userId && isHistoryRowEnabled(data[i])) {
+      rows.push({ rowNumber: i + 1, row: data[i], timestamp: parseTimestampSafe(data[i][0]) });
+    }
+  }
+  rows.sort(function(a, b) { return a.timestamp - b.timestamp; });
+  let cumulativeExp = 0;
+  const accs = [];
+  rows.forEach(function(item, idx) {
+    const row = item.row;
+    const gainedExp = parseInt(row[9]) || 0;
+    cumulativeExp += gainedExp;
+    const acc = parseAccuracyToPercent(row[3]);
+    if (acc !== null) accs.push(acc);
+    const recent = accs.slice(-10);
+    const avg10 = recent.length > 0 ? Math.round(recent.reduce(function(a, b) { return a + b; }, 0) / recent.length) + "%" : "";
+    const overall = accs.length > 0 ? Math.round(accs.reduce(function(a, b) { return a + b; }, 0) / accs.length) + "%" : "";
+    sheet.getRange(item.rowNumber, 11).setValue(cumulativeExp);
+    sheet.getRange(item.rowNumber, 12).setValue(avg10);
+    sheet.getRange(item.rowNumber, 13).setValue(overall);
+    sheet.getRange(item.rowNumber, 16).setValue(idx + 1);
+    sheet.getRange(item.rowNumber, 17).setValue(row[0]);
+  });
 }
 
 function handleDetectDuplicates(p) {
