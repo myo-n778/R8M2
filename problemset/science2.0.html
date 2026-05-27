@@ -486,7 +486,7 @@
     <!-- スクリプト部分は以前のものを継続して使用 -->
     <script>
         const SHARED = window.ScienceShared || {};
-        const FIXED_GAS_URL = SHARED.gasUrl || "https://script.google.com/macros/s/AKfycbzOWg0wS37iCzTz5-UAYXudBNmklcCAkMqTI1toPfbW8ZAepaAR6Ou4HmpZbqbXAHi7og/exec";
+        const FIXED_GAS_URL = SHARED.gasUrl || "https://script.google.com/macros/s/AKfycbz5TVtb7iU_qd9C5oeq3ukf7O7SZSiDlrnfs6aDGiHSvf0LJZtrKdTqwrT469MaevvRZw/exec";
         const FIXED_SPREADSHEET_URL = "https://docs.google.com/spreadsheets/d/1LCGCVjeiTicyclXFTP0EaxxB_RluZJrveWPo1FdLzsk/edit";
         const IMAGE_MAP_URL = "./data/image-map.json";
         const normalizeUserName = SHARED.normalizeUserName || ((name) => name ? name.normalize('NFKC').trim() : '');
@@ -520,6 +520,8 @@
         let canAnswer = true; let chartInstance = null;
         let isSessionFinalizing = false;
         let currentSessionId = "";
+        let sessionLogPromise = null;
+        let sessionLogCompleted = false;
         let chartScriptLoading = null;
         let sessionAnswers = [];
         let isRankingPublic = true; // ランキング公開設定（デフォルトは公開）
@@ -1477,11 +1479,12 @@
             });
         }
 
-        function createSessionId() {
+        function createSessionId(userId = "") {
+            const baseUserId = String(userId || `${USER_CLASS}-${USER_NUMBER}-${USER_NAME}` || "user").replace(/\s+/g, "_");
             if (window.crypto && typeof window.crypto.randomUUID === 'function') {
-                return window.crypto.randomUUID();
+                return `${baseUserId}-${Date.now()}-${window.crypto.randomUUID().slice(0, 8)}`;
             }
-            return `session-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+            return `${baseUserId}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
         }
 
         function buildSessionDetails(limit = quizData.length) {
@@ -1495,6 +1498,8 @@
 
         async function logDetailedResultsToSpreadsheet(pct, correct, total, detailEntries = null, rangeLabel = currentSessionRangeLabel) {
             if (!FIXED_GAS_URL) return null;
+            if (sessionLogCompleted) return { status: 'duplicate_skipped', appliedExp: 0, expReason: '重複記録スキップ' };
+            if (sessionLogPromise) return sessionLogPromise;
             // 入力フィールドからURLを取得
             const urlInput = getEl('main-spreadsheet-url');
             const spreadsheetUrl = urlInput && urlInput.value ? urlInput.value : FIXED_SPREADSHEET_URL;
@@ -1503,6 +1508,7 @@
             
             // ユーザーIDの生成（クラス-番号-名前形式）
             const userId = `${USER_CLASS}-${USER_NUMBER}-${USER_NAME}`;
+            if (!currentSessionId) currentSessionId = createSessionId(userId);
             
             const payload = { 
                 action: 'logAll', 
@@ -1518,16 +1524,24 @@
                 details: JSON.stringify(detailEntries || buildSessionDetails()), 
                 gainedExp: correct, 
                 finalStreak: streak, 
-                sessionId: currentSessionId || createSessionId(),
+                sessionId: currentSessionId,
                 isPublic: isRankingPublic ? '1' : '0', 
                 status: USER_STATUS || '' 
             };
-            try {
+            sessionLogPromise = (async () => {
                 const result = await fetchWithRetry(`${FIXED_GAS_URL}?${new URLSearchParams(payload).toString()}`);
+                if (result && (result.status === 'success' || result.status === 'duplicate_skipped')) {
+                    sessionLogCompleted = true;
+                }
                 window.syncAllFromSpreadsheet(true);
                 return result;
+            })();
+            try {
+                return await sessionLogPromise;
             } catch (e) {
                 return null;
+            } finally {
+                if (!sessionLogCompleted) sessionLogPromise = null;
             }
         }
 
@@ -2468,7 +2482,10 @@
             await loadImageMap();
             currentIdx = 0; score = 0; streak = 0; sessionAnswers = []; 
             isSessionFinalizing = false;
-            currentSessionId = createSessionId();
+            const userId = `${USER_CLASS}-${USER_NUMBER}-${USER_NAME}`;
+            currentSessionId = createSessionId(userId);
+            sessionLogPromise = null;
+            sessionLogCompleted = false;
             // シャッフルが有効な場合、問題の出題順をシャッフル
             if (isQuestionShuffleEnabled) {
                 quizData = shuffleArray([...quizData]);
@@ -2669,7 +2686,7 @@
         }
 
         function finishSession() {
-            if (isSessionFinalizing) return;
+            if (isSessionFinalizing || sessionLogCompleted || sessionLogPromise) return;
             isSessionFinalizing = true;
             const oldExp = parseInt(getEl('total-neural-exp').innerText) || 0;
             const oldLv = Math.floor(oldExp / 10);
@@ -2692,7 +2709,9 @@
                     if (newLv > oldLv) lvUpMsg.classList.remove('hidden');
                     else lvUpMsg.classList.add('hidden');
                 }
-            }).finally(() => { isSessionFinalizing = false; });
+            }).finally(() => {
+                if (!sessionLogCompleted) isSessionFinalizing = false;
+            });
             
             // 復習システムの情報をローカルストレージに保存
             try {

@@ -216,6 +216,9 @@ const requestedExp = parseInt(p.gainedExp) || 0;
 const sessionId = String(p.sessionId || '').trim();
 const historyHeaders = ["日時", "単元", "範囲", "正解率", "スコア", "ユーザー名", "ユーザーID", "クラス", "番号", "取得EXP", "累計EXP", "10回平均正解率", "通算正答率", "連続正解数", "公開設定", "セッション数", "最終取り組み日", "ステータス", "有効", "セッションID"];
 const historySheet = getOrCreateSheet(ss, "履歴ログ", historyHeaders);
+if (historySheet.getLastColumn() < historyHeaders.length) {
+  historySheet.getRange(1, 1, 1, historyHeaders.length).setValues([historyHeaders]);
+}
 let hData = historySheet.getDataRange().getValues();
 let userRows = hData.filter((r, idx) => idx > 0 && String(r[6]) === String(p.userId) && isHistoryRowEnabled(r));
 
@@ -235,23 +238,23 @@ if (hData.length > 1) {
   }
 }
 
-// 重複防止（fail-open）: 直近60秒以内に同一ユーザー・同一セット・同一得点の記録があればスキップ
+// 重複防止（fail-open）: 同一sessionId、または指定秒以内の同一ユーザー・同一セット・同一得点をスキップ
 try {
   const duplicateLogWindowSec = Math.max(0, Number(runtimeConfig.duplicateLogWindowSec) || 60);
   const DUP_WINDOW_MS = duplicateLogWindowSec * 1000;
-  if (userRows.length > 0) {
-    const lastRow = userRows[userRows.length - 1];
-    const lastTs = new Date(lastRow[0]).getTime();
+  for (let dupIdx = userRows.length - 1; dupIdx >= 0; dupIdx--) {
+    const row = userRows[dupIdx];
+    const sameSession = sessionId && String(row[19] || '').trim() === sessionId;
+    const lastTs = new Date(row[0]).getTime();
     const nowTs = now.getTime();
     const withinWindow = !isNaN(lastTs) && nowTs >= lastTs && (nowTs - lastTs) <= DUP_WINDOW_MS;
-    const sameSession = sessionId && String(lastRow[19] || '') === sessionId;
-    const sameSet = String(lastRow[1] || '') === String(p.summaryEra || '') && String(lastRow[2] || '') === String(p.summaryRange || '');
-    const sameScore = String(lastRow[4] || '') === String(p.summaryScore || '');
-    const sameAcc = String(lastRow[3] || '') === String(p.summaryAccuracy || '');
+    const sameSet = String(row[1] || '') === String(p.summaryEra || '') && String(row[2] || '') === String(p.summaryRange || '');
+    const sameScore = String(row[4] || '') === String(p.summaryScore || '');
+    const sameAcc = String(row[3] || '') === String(p.summaryAccuracy || '');
     if (sameSession || (withinWindow && sameSet && sameScore && sameAcc)) {
-      const hasNewFormat = lastRow.length >= 18;
+      const hasNewFormat = row.length >= 18;
       const cumulativeExpIndex = hasNewFormat ? 10 : 9;
-      const currentTotalExp = parseInt(lastRow[cumulativeExpIndex]) || 0;
+      const currentTotalExp = parseInt(row[cumulativeExpIndex]) || 0;
       return returnJson({
         status: "duplicate_skipped",
         message: sameSession ? "同一セッションIDの記録をスキップしました" : `${duplicateLogWindowSec}秒以内の同一記録をスキップしました`,
