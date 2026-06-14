@@ -629,6 +629,7 @@
         let rankingData = [];
         let pastSeasonRankings = [];
         let lifetimeRankingData = [];
+        let rankingColumnSizingState = null;
         let selectedGoal = 80;
         let runtimeConfigState = null;
         let imageMapById = {};
@@ -1737,6 +1738,18 @@
             return { maxNameWidth, maxStatusWidth };
         }
 
+        function getAllRankingEntriesForColumnSizing() {
+            const entries = [];
+            if (Array.isArray(rankingData)) entries.push(...rankingData);
+            if (Array.isArray(lifetimeRankingData)) entries.push(...lifetimeRankingData);
+            if (Array.isArray(pastSeasonRankings)) {
+                pastSeasonRankings.forEach((season) => {
+                    if (season && Array.isArray(season.ranking)) entries.push(...season.ranking);
+                });
+            }
+            return entries;
+        }
+
         function getRankingLastDateDisplay(r, isMe, historyForMe = userHistory) {
             if (isMe && historyForMe && historyForMe.length > 0) {
                 const sortedUserHistory = [...historyForMe].sort((a, b) => b.timestamp - a.timestamp);
@@ -1762,6 +1775,7 @@
             const headerEl = options.headerEl || null;
             const historyForMe = options.historyForMe || userHistory;
             const emptyMessage = options.emptyMessage || 'No ranking data available';
+            const columnSizing = options.columnSizing || null;
 
             if (entries.length === 0) {
                 if (headerEl) headerEl.style.display = 'grid';
@@ -1769,7 +1783,7 @@
                 return null;
             }
 
-            const { maxNameWidth, maxStatusWidth } = measureRankingColumns(entries);
+            const { maxNameWidth, maxStatusWidth } = columnSizing || measureRankingColumns(entries);
             const gridTemplate = getRankingGridTemplate(maxNameWidth, maxStatusWidth);
             if (headerEl) {
                 headerEl.style.display = 'grid';
@@ -1801,7 +1815,7 @@
             return { gridTemplate };
         }
 
-        function renderPastSeasonRankings() {
+        function renderPastSeasonRankings(options = {}) {
             const panel = getEl('past-season-rankings-panel');
             const countEl = getEl('past-season-ranking-count');
             const container = getEl('past-season-rankings-container');
@@ -1809,6 +1823,10 @@
 
             const seasons = Array.isArray(pastSeasonRankings) ? pastSeasonRankings : [];
             countEl.innerText = `${seasons.length} season${seasons.length === 1 ? '' : 's'}`;
+            if (!panel.open && !options.force) {
+                container.innerHTML = '';
+                return;
+            }
             if (seasons.length === 0) {
                 container.innerHTML = '<div class="text-center text-[9px] text-slate-500/70 py-3 italic">No past season ranking yet</div>';
                 return;
@@ -1832,13 +1850,14 @@
                 const headerEl = seasonBlock ? seasonBlock.previousElementSibling : null;
                 renderRankingTable(seasonBlock, season.ranking || [], {
                     headerEl,
+                    columnSizing: options.columnSizing,
                     historyForMe: cumulativeHistory,
                     emptyMessage: 'No public users'
                 });
             });
         }
 
-        function renderLifetimeRanking() {
+        function renderLifetimeRanking(options = {}) {
             const panel = getEl('lifetime-ranking-panel');
             const countEl = getEl('lifetime-ranking-count');
             const container = getEl('lifetime-ranking-container');
@@ -1846,11 +1865,16 @@
 
             const entries = Array.isArray(lifetimeRankingData) ? lifetimeRankingData : [];
             countEl.innerText = `${entries.length} users`;
+            if (!panel.open && !options.force) {
+                container.innerHTML = '';
+                return;
+            }
             container.innerHTML = `${createRankingHeaderHtml()}<div id="lifetime-ranking-rows" class="space-y-1"></div>`;
             const rowsEl = getEl('lifetime-ranking-rows');
             const headerEl = rowsEl ? rowsEl.previousElementSibling : null;
             renderRankingTable(rowsEl, entries, {
                 headerEl,
+                columnSizing: options.columnSizing,
                 historyForMe: cumulativeHistory,
                 emptyMessage: 'No lifetime ranking data available'
             });
@@ -2068,9 +2092,10 @@
                 if (rankCont) { 
                     // ランキングテーブルは常に表示（データがない場合でも）
                     if (rankWrapper) rankWrapper.style.display = '';
-                    renderRankingTable(rankCont, rankingData, { headerEl: rankHeader });
-                    renderPastSeasonRankings();
-                    renderLifetimeRanking();
+                    rankingColumnSizingState = measureRankingColumns(getAllRankingEntriesForColumnSizing());
+                    renderRankingTable(rankCont, rankingData, { headerEl: rankHeader, columnSizing: rankingColumnSizingState });
+                    renderPastSeasonRankings({ columnSizing: rankingColumnSizingState });
+                    renderLifetimeRanking({ columnSizing: rankingColumnSizingState });
                     
                     // 日付ごとの問題数と正答率を計算・表示（別の枠内で一番下に配置）
                     const dailyStatsEl = getEl('daily-stats-container');
@@ -3179,6 +3204,18 @@
             setOnClick('sync-all-btn-action', () => window.syncAllFromSpreadsheet(false)); 
             setOnClick('cloud-sync-toggle-btn', () => { const area = getEl('sync-area'); if (area) area.classList.toggle('hidden'); }); 
             setOnClick('app-url-copy-btn', copyAppUrl);
+            const pastRankingPanel = getEl('past-season-rankings-panel');
+            if (pastRankingPanel) {
+                pastRankingPanel.addEventListener('toggle', () => {
+                    if (pastRankingPanel.open) renderPastSeasonRankings({ columnSizing: rankingColumnSizingState || measureRankingColumns(getAllRankingEntriesForColumnSizing()), force: true });
+                });
+            }
+            const lifetimeRankingPanel = getEl('lifetime-ranking-panel');
+            if (lifetimeRankingPanel) {
+                lifetimeRankingPanel.addEventListener('toggle', () => {
+                    if (lifetimeRankingPanel.open) renderLifetimeRanking({ columnSizing: rankingColumnSizingState || measureRankingColumns(getAllRankingEntriesForColumnSizing()), force: true });
+                });
+            }
             setOnClick('admin-load-btn', loadAdminStatus);
             setOnClick('announcement-save-btn', saveAnnouncementFromAdmin);
             setOnClick('admin-settings-save-btn', saveAdminSettings);
