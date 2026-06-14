@@ -361,22 +361,18 @@
                             <div class="bg-slate-900/50 p-2 md:p-3 rounded-xl border border-white/5 text-center"><p class="text-[8px] text-slate-300 mb-0.5 uppercase font-bold">最大連続</p><p id="max-streak-display" class="text-sm md:text-lg font-flashy text-cyan-400">0</p></div>
                             <div class="bg-slate-900/50 p-2 md:p-3 rounded-xl border border-white/5 text-center"><p class="text-[8px] text-slate-300 mb-0.5 uppercase font-bold">Quit</p><p id="quit-count-display" class="text-sm md:text-lg font-flashy text-rose-300">0</p></div>
                         </div>
-                        <div id="ranking-card-wrapper" class="ranking-card space-y-2">
-                            <h3 class="text-[10px] font-black text-amber-400 uppercase italic flex items-center gap-2 mb-3"><i class="fas fa-trophy"></i> Season Top Scholars</h3>
+                        <details id="ranking-card-wrapper" class="ranking-card space-y-2">
+                            <summary class="cursor-pointer text-[10px] font-black text-amber-400 uppercase italic flex items-center justify-between gap-2 mb-3">
+                                <span><i class="fas fa-trophy"></i> Season Top Scholars</span>
+                                <span id="ranking-summary-count" class="text-[9px] text-white/35 normal-case">0 users</span>
+                            </summary>
                             <div id="ranking-header" class="grid gap-3 items-center text-[8px] font-black text-white/40 uppercase border-b border-white/10 pb-1.5 mb-1" style="grid-template-columns: 30px auto 50px 35px 70px 70px 40px 50px 50px 140px auto;">
                                 <span class="text-center">RK</span><span>NAME</span><span class="text-left">EXP</span><span class="text-left">LV</span><span class="text-left">10th Ave.</span><span class="text-left">ALL Ave.</span><span class="text-left">SESS</span><span class="text-left">CST</span><span class="text-left">MST</span><span class="text-left">LAST</span><span class="text-left">STATUS</span>
                             </div>
                             <div id="ranking-container" class="space-y-1"></div>
-                        </div>
+                        </details>
                     </div>
                     <div id="daily-stats-container" class="glass-panel rounded-[1.5rem] md:rounded-[2.5rem] p-4 md:p-6 space-y-3 max-h-[200px] overflow-y-auto"></div>
-                    <details id="past-records-panel" class="glass-panel rounded-[1.5rem] md:rounded-[2.5rem] p-4 md:p-6 space-y-3">
-                        <summary class="cursor-pointer text-[10px] font-black uppercase italic text-slate-300 flex items-center justify-between gap-2">
-                            <span><i class="fas fa-archive text-slate-400 mr-2"></i>Past Records</span>
-                            <span id="past-records-summary" class="text-[9px] text-slate-500 normal-case">過去成績 0件</span>
-                        </summary>
-                        <div id="past-records-content" class="pt-3 text-[9px] text-slate-300"></div>
-                    </details>
                 </div>
 
                 <div class="glass-panel rounded-[1.5rem] md:rounded-[2.5rem] p-6 md:p-8 space-y-6 flex flex-col">
@@ -1886,6 +1882,10 @@
                 const rankCont = getEl('ranking-container');
                 const rankWrapper = getEl('ranking-card-wrapper');
                 const rankHeader = getEl('ranking-header');
+                const rankSummaryCount = getEl('ranking-summary-count');
+                if (rankSummaryCount) {
+                    rankSummaryCount.innerText = `${(rankingData && rankingData.length) || 0} users`;
+                }
                 
                 if (rankCont) { 
                     // ランキングテーブルは常に表示（データがない場合でも）
@@ -2079,57 +2079,9 @@
                             dailyStatsEl.style.display = '';
                         }
                     }
-                    renderPastRecords();
                 }
                 renderPerformanceChart(userHistory);
             } catch (err) { console.error("Stats Error:", err); }
-        }
-
-        function renderPastRecords() {
-            const summaryEl = getEl('past-records-summary');
-            const contentEl = getEl('past-records-content');
-            if (!summaryEl || !contentEl) return;
-            const activeSeasonId = String((runtimeConfigState && runtimeConfigState.activeSeasonId) || '').trim();
-            const pastHistory = (Array.isArray(cumulativeHistory) ? cumulativeHistory : [])
-                .filter((h) => String(h && h.seasonId || '').trim() !== activeSeasonId)
-                .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
-            summaryEl.innerText = `過去成績 ${pastHistory.length}件`;
-            if (pastHistory.length === 0) {
-                contentEl.innerHTML = '<div class="text-slate-500 italic py-2">過去シーズンの成績はまだありません。</div>';
-                return;
-            }
-
-            const totalSessions = pastHistory.length;
-            const totalQuestions = pastHistory.reduce((sum, h) => sum + (Number(h.totalQ) || 0), 0);
-            const totalCorrect = pastHistory.reduce((sum, h) => sum + (Number(h.correctCount) || 0), 0);
-            const totalPastExp = pastHistory.reduce((sum, h) => {
-                const gained = Number(h.gainedExp);
-                return sum + (Number.isFinite(gained) ? gained : (Number(h.correctCount) || 0));
-            }, 0);
-            const avgAccuracy = totalQuestions > 0 ? Math.round((totalCorrect / totalQuestions) * 100) : 0;
-            const latestRows = pastHistory.slice(0, 10).map((h) => {
-                const date = h.timestamp ? new Date(h.timestamp) : null;
-                const dateText = date && !isNaN(date.getTime())
-                    ? `${date.getFullYear()}/${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getDate()).padStart(2, '0')}`
-                    : (h.date || '--');
-                return `<div class="grid grid-cols-[86px_1fr_56px_56px] gap-2 items-center py-1.5 border-b border-white/5 last:border-0">
-                    <span class="text-slate-400">${dateText}</span>
-                    <span class="text-slate-200 truncate" title="${String(h.summaryEra || '')}">${String(h.summaryEra || '--')}</span>
-                    <span class="text-emerald-300 text-center font-bold">${String(h.score || '--')}</span>
-                    <span class="text-indigo-300 text-center font-bold">${Number(h.correctCount) || 0}/${Number(h.totalQ) || 0}</span>
-                </div>`;
-            }).join('');
-
-            contentEl.innerHTML = `
-                <div class="grid grid-cols-2 md:grid-cols-4 gap-2 mb-3">
-                    <div class="bg-black/20 border border-white/5 rounded-xl p-2 text-center"><p class="text-[8px] text-slate-500 font-black uppercase">Sessions</p><p class="font-flashy text-slate-100">${totalSessions}</p></div>
-                    <div class="bg-black/20 border border-white/5 rounded-xl p-2 text-center"><p class="text-[8px] text-slate-500 font-black uppercase">Questions</p><p class="font-flashy text-cyan-300">${totalQuestions}</p></div>
-                    <div class="bg-black/20 border border-white/5 rounded-xl p-2 text-center"><p class="text-[8px] text-slate-500 font-black uppercase">Accuracy</p><p class="font-flashy text-emerald-300">${avgAccuracy}%</p></div>
-                    <div class="bg-black/20 border border-white/5 rounded-xl p-2 text-center"><p class="text-[8px] text-slate-500 font-black uppercase">Past EXP</p><p class="font-flashy text-indigo-300">${totalPastExp}</p></div>
-                </div>
-                <div class="text-[8px] text-slate-500 uppercase font-black mb-1">Latest 10 past sessions</div>
-                <div class="max-h-52 overflow-y-auto pr-1">${latestRows}</div>
-            `;
         }
 
         function ensureChartJsLoaded() {
