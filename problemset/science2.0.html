@@ -1760,6 +1760,45 @@
             return entries;
         }
 
+        function buildFallbackLifetimeRanking() {
+            const map = {};
+            const addEntries = (entries) => {
+                (Array.isArray(entries) ? entries : []).forEach((r) => {
+                    const key = r.userId || r.id || r.name || r.dbName || r.userName || r.user_name;
+                    if (!key) return;
+                    if (!map[key]) {
+                        map[key] = {
+                            name: r.name || r.dbName || r.userName || r.user_name || '--',
+                            exp: 0,
+                            avg10: r.avg10 || '--%',
+                            overall: r.overall || '--%',
+                            count: 0,
+                            currentStreak: r.currentStreak,
+                            maxStreak: r.maxStreak,
+                            lastAttemptDate: r.lastAttemptDate || '',
+                            status: r.status || '',
+                            latestTimestamp: r.latestTimestamp || 0
+                        };
+                    }
+                    map[key].exp += Number(r.exp) || 0;
+                    map[key].count += Number(r.count) || 0;
+                    const ts = Number(r.latestTimestamp) || 0;
+                    if (ts >= (map[key].latestTimestamp || 0)) {
+                        map[key].avg10 = r.avg10 || map[key].avg10;
+                        map[key].overall = r.overall || map[key].overall;
+                        map[key].currentStreak = r.currentStreak;
+                        map[key].maxStreak = r.maxStreak;
+                        map[key].lastAttemptDate = r.lastAttemptDate || map[key].lastAttemptDate;
+                        map[key].status = r.status || map[key].status;
+                        map[key].latestTimestamp = ts;
+                    }
+                });
+            };
+            addEntries(rankingData);
+            (Array.isArray(pastSeasonRankings) ? pastSeasonRankings : []).forEach((season) => addEntries(season.ranking));
+            return Object.values(map).sort((a, b) => (Number(b.exp) || 0) - (Number(a.exp) || 0));
+        }
+
         function getRankingLastDateDisplay(r, isMe, historyForMe = userHistory) {
             if (isMe && historyForMe && historyForMe.length > 0) {
                 const sortedUserHistory = [...historyForMe].sort((a, b) => b.timestamp - a.timestamp);
@@ -1786,18 +1825,16 @@
             const historyForMe = options.historyForMe || userHistory;
             const emptyMessage = options.emptyMessage || 'No ranking data available';
             const columnSizing = options.columnSizing || null;
-
-            if (entries.length === 0) {
-                if (headerEl) headerEl.style.display = 'grid';
-                container.innerHTML = `<div class="text-center text-[9px] text-slate-500/70 py-4 italic">${emptyMessage}</div>`;
-                return null;
-            }
-
             const { maxNameWidth, maxStatusWidth } = columnSizing || measureRankingColumns(entries);
             const gridTemplate = getRankingGridTemplate(maxNameWidth, maxStatusWidth);
             if (headerEl) {
                 headerEl.style.display = 'grid';
                 headerEl.style.gridTemplateColumns = gridTemplate;
+            }
+
+            if (entries.length === 0) {
+                container.innerHTML = `<div class="text-center text-[9px] text-slate-500/70 py-4 italic">${emptyMessage}</div>`;
+                return null;
             }
 
             container.innerHTML = entries.map((r, i) => {
@@ -3078,6 +3115,9 @@
                         console.log('最初のランキングエントリ:', rankingData[0]);
                         console.log('最初のエントリのキー:', Object.keys(rankingData[0]));
                     }
+                }
+                if (lifetimeRankingData.length === 0) {
+                    lifetimeRankingData = buildFallbackLifetimeRanking();
                 }
                 // 連続正解数をグローバル変数に保存
                 window.currentStreak = result.currentStreak || 0;
