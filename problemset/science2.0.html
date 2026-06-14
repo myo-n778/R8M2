@@ -353,16 +353,16 @@
                         </div>
                         <div style="position:relative; height:240px; width:100%; margin-top: 10px;"><canvas id="performanceChart"></canvas></div>
                         <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
-                            <div class="bg-slate-900/50 p-2 md:p-3 rounded-xl border border-white/5 text-center"><p class="text-[8px] text-slate-300 mb-0.5 uppercase font-bold">Total EXP</p><p id="total-neural-exp" class="text-sm md:text-lg font-flashy text-purple-400">0</p></div>
+                            <div class="bg-slate-900/50 p-2 md:p-3 rounded-xl border border-white/5 text-center"><p class="text-[8px] text-slate-300 mb-0.5 uppercase font-bold">今期EXP</p><p id="total-neural-exp" class="text-sm md:text-lg font-flashy text-purple-400">0</p><p id="lifetime-exp-display" class="text-[8px] text-slate-500 mt-0.5">累計EXP: 0</p></div>
                             <div class="bg-slate-900/50 p-2 md:p-3 rounded-xl border border-white/5 text-center"><p class="text-[8px] text-slate-300 mb-0.5 uppercase font-bold">10回平均</p><p id="recent-accuracy" class="text-sm md:text-lg font-flashy text-orange-400">--%</p></div>
                             <div class="bg-slate-900/50 p-2 md:p-3 rounded-xl border border-white/5 text-center"><p class="text-[8px] text-slate-300 mb-0.5 uppercase font-bold">通算正答率</p><p id="best-accuracy" class="text-sm md:text-lg font-flashy text-emerald-400">--%</p></div>
-                            <div class="bg-slate-900/50 p-2 md:p-3 rounded-xl border border-white/5 text-center"><p class="text-[8px] text-slate-300 mb-0.5 uppercase font-bold">累計演習</p><p id="total-sessions-count" class="text-sm md:text-lg font-flashy text-white">0</p></div>
+                            <div class="bg-slate-900/50 p-2 md:p-3 rounded-xl border border-white/5 text-center"><p class="text-[8px] text-slate-300 mb-0.5 uppercase font-bold">今期演習</p><p id="total-sessions-count" class="text-sm md:text-lg font-flashy text-white">0</p></div>
                             <div class="bg-slate-900/50 p-2 md:p-3 rounded-xl border border-white/5 text-center"><p class="text-[8px] text-slate-300 mb-0.5 uppercase font-bold">現在連続</p><p id="current-streak-display" class="text-sm md:text-lg font-flashy text-amber-400">0</p></div>
                             <div class="bg-slate-900/50 p-2 md:p-3 rounded-xl border border-white/5 text-center"><p class="text-[8px] text-slate-300 mb-0.5 uppercase font-bold">最大連続</p><p id="max-streak-display" class="text-sm md:text-lg font-flashy text-cyan-400">0</p></div>
                             <div class="bg-slate-900/50 p-2 md:p-3 rounded-xl border border-white/5 text-center"><p class="text-[8px] text-slate-300 mb-0.5 uppercase font-bold">Quit</p><p id="quit-count-display" class="text-sm md:text-lg font-flashy text-rose-300">0</p></div>
                         </div>
                         <div id="ranking-card-wrapper" class="ranking-card space-y-2">
-                            <h3 class="text-[10px] font-black text-amber-400 uppercase italic flex items-center gap-2 mb-3"><i class="fas fa-trophy"></i> Top Scholars</h3>
+                            <h3 class="text-[10px] font-black text-amber-400 uppercase italic flex items-center gap-2 mb-3"><i class="fas fa-trophy"></i> Season Top Scholars</h3>
                             <div id="ranking-header" class="grid gap-3 items-center text-[8px] font-black text-white/40 uppercase border-b border-white/10 pb-1.5 mb-1" style="grid-template-columns: 30px auto 50px 35px 70px 70px 40px 50px 50px 140px auto;">
                                 <span class="text-center">RK</span><span>NAME</span><span class="text-left">EXP</span><span class="text-left">LV</span><span class="text-left">10th Ave.</span><span class="text-left">ALL Ave.</span><span class="text-left">SESS</span><span class="text-left">CST</span><span class="text-left">MST</span><span class="text-left">LAST</span><span class="text-left">STATUS</span>
                             </div>
@@ -606,6 +606,8 @@
         let isWeakPointsMode = false; // Weak Pointsモード（間違えた問題のみ表示）
         let currentSessionEra = ""; let currentSessionRangeLabel = "";
         let userHistory = [];
+        let cumulativeHistory = [];
+        let lifetimeSummaryState = { totalExp: 0, sessionCount: 0, seasonExp: 0, seasonSessionCount: 0 };
         let questionStats = {};
         let rankingData = [];
         let selectedGoal = 80;
@@ -1500,6 +1502,8 @@
             USER_STATUS = '';
             isRankingPublic = true;
             userHistory = [];
+            cumulativeHistory = [];
+            lifetimeSummaryState = { totalExp: 0, sessionCount: 0, seasonExp: 0, seasonSessionCount: 0 };
             questionStats = {};
             localStorage.removeItem('ethics_user_name');
             localStorage.removeItem('ethics_user_class');
@@ -1675,6 +1679,12 @@
             try {
                 const sorted = [...userHistory].sort((a,b) => b.timestamp - a.timestamp);
                 const latest = sorted[0];
+                const lifetimeTotalExp = Number(lifetimeSummaryState && lifetimeSummaryState.totalExp) || 0;
+                const lifetimeDisplay = getEl('lifetime-exp-display');
+                if (lifetimeDisplay) {
+                    const lifetimeSessions = Number(lifetimeSummaryState && lifetimeSummaryState.sessionCount) || 0;
+                    lifetimeDisplay.innerText = `累計EXP: ${lifetimeTotalExp} / 累計演習: ${lifetimeSessions}`;
+                }
                 if (latest) {
                     const totalExp = latest.totalExp || 0;
                     const expEl = getEl('total-neural-exp');
@@ -1704,7 +1714,7 @@
                     const lv = Math.floor(totalExp / 10);
                     if (getEl('neural-level-display')) getEl('neural-level-display').innerText = `LV. ${String(lv).padStart(2, '0')}`;
                 } else {
-                    // 履歴がない場合の初期値
+                    // 今期履歴がない場合の初期値
                     if (getEl('total-neural-exp')) getEl('total-neural-exp').innerText = '0';
                     if (getEl('recent-accuracy')) getEl('recent-accuracy').innerText = '--%';
                     if (getEl('best-accuracy')) getEl('best-accuracy').innerText = '--%';
@@ -2964,7 +2974,9 @@
                     }); 
                 }
                 updateRuntimeConfigUI(result.config || null);
-                if(result.history) userHistory = result.history; 
+                cumulativeHistory = Array.isArray(result.history) ? result.history : [];
+                userHistory = Array.isArray(result.seasonHistory) ? result.seasonHistory : cumulativeHistory;
+                lifetimeSummaryState = result.lifetimeSummary || { totalExp: 0, sessionCount: cumulativeHistory.length, seasonExp: 0, seasonSessionCount: userHistory.length };
                 if(result.ranking) {
                     rankingData = result.ranking;
                     console.log('ランキングデータ:', rankingData);

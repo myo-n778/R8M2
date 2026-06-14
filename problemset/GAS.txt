@@ -40,6 +40,12 @@ var SCIENCE_EXP_CONFIG = globalThis.SCIENCE_EXP_CONFIG || {
 };
 globalThis.SCIENCE_EXP_CONFIG = SCIENCE_EXP_CONFIG;
 
+var SCIENCE_ACTIVE_SEASON_ID = "2026-after-exam-1";
+
+function getHistoryHeaders() {
+  return ["日時", "単元", "範囲", "正解率", "スコア", "ユーザー名", "ユーザーID", "クラス", "番号", "取得EXP", "累計EXP", "10回平均正解率", "通算正答率", "連続正解数", "公開設定", "セッション数", "最終取り組み日", "ステータス", "有効", "セッションID", "シーズンID"];
+}
+
 // 将来の設定シート連携用ヘルパー（現時点では未使用）
 // 形式: シート名「設定」、A列=キー、B列=値
 function readRuntimeConfigFromSheet(ss) {
@@ -53,7 +59,8 @@ function readRuntimeConfigFromSheet(ss) {
     announcementText: "",
     announcementUpdatedAt: "",
     adminKey: "",
-    hiddenProblemSheets: []
+    hiddenProblemSheets: [],
+    activeSeasonId: SCIENCE_ACTIVE_SEASON_ID
   };
   try {
     const configSheet = ss.getSheetByName("設定");
@@ -96,7 +103,8 @@ function readRuntimeConfigFromSheet(ss) {
       announcementText: parseText(map.announcementText, defaults.announcementText),
       announcementUpdatedAt: parseText(map.announcementUpdatedAt, defaults.announcementUpdatedAt),
       adminKey: parseText(map.adminKey, defaults.adminKey),
-      hiddenProblemSheets: parseList(map.hiddenProblemSheets, defaults.hiddenProblemSheets)
+      hiddenProblemSheets: parseList(map.hiddenProblemSheets, defaults.hiddenProblemSheets),
+      activeSeasonId: parseText(map.activeSeasonId, defaults.activeSeasonId)
     };
   } catch (e) {
     // 設定シート不備では処理を止めず、既定値で継続する
@@ -208,13 +216,15 @@ try {
 }
 logLock = LockService.getScriptLock();
 logLock.waitLock(10000);
+ensureDefaultConfigRows(ss);
 const runtimeConfig = readRuntimeConfigFromSheet(ss);
 const details = JSON.parse(p.details);
 const now = new Date();
 const timestampStr = Utilities.formatDate(now, "JST", "yyyy/MM/dd HH:mm:ss");
 const requestedExp = parseInt(p.gainedExp) || 0;
 const sessionId = String(p.sessionId || '').trim();
-const historyHeaders = ["日時", "単元", "範囲", "正解率", "スコア", "ユーザー名", "ユーザーID", "クラス", "番号", "取得EXP", "累計EXP", "10回平均正解率", "通算正答率", "連続正解数", "公開設定", "セッション数", "最終取り組み日", "ステータス", "有効", "セッションID"];
+const activeSeasonId = String(runtimeConfig.activeSeasonId || SCIENCE_ACTIVE_SEASON_ID).trim() || SCIENCE_ACTIVE_SEASON_ID;
+const historyHeaders = getHistoryHeaders();
 const historySheet = getOrCreateSheet(ss, "履歴ログ", historyHeaders);
 if (historySheet.getLastColumn() < historyHeaders.length) {
   historySheet.getRange(1, 1, 1, historyHeaders.length).setValues([historyHeaders]);
@@ -382,7 +392,7 @@ const userClass = p.userClass || '';
 const userNumber = p.userNumber || '';
 historySheet.appendRow([
   timestampStr, p.summaryEra, p.summaryRange, p.summaryAccuracy, p.summaryScore,
-  p.dbName, p.userId, userClass, userNumber, gainedExp, newTotalExp, avg10AccStr, overallAccStr, currentStreak, isPublic, sessionCount, lastAttemptDate, userStatus, "1", sessionId
+  p.dbName, p.userId, userClass, userNumber, gainedExp, newTotalExp, avg10AccStr, overallAccStr, currentStreak, isPublic, sessionCount, lastAttemptDate, userStatus, "1", sessionId, activeSeasonId
 ]);
 
 // 成績一覧シートを更新（全分野を1つのシートにまとめる）
@@ -415,7 +425,8 @@ return returnJson({
   newTotalExp: newTotalExp,
   requestedExp: requestedExp,
   appliedExp: gainedExp,
-  expReason: expReasonParts.join(" / ")
+  expReason: expReasonParts.join(" / "),
+  activeSeasonId: activeSeasonId
 });
 
 
@@ -514,8 +525,10 @@ try {
 } catch (openError) {
   return returnJson({ error: "Invalid argument: id - スプレッドシートが見つかりません。IDを確認してください: " + openError.toString() });
 }
+ensureDefaultConfigRows(ss);
 const runtimeConfig = readRuntimeConfigFromSheet(ss);
-const result = { problems: {}, userStats: {}, history: [], ranking: [], currentStreak: 0, maxStreak: 0, quitCount: 0, sheetOrder: [], imageMap: [] };
+const activeSeasonId = String(runtimeConfig.activeSeasonId || SCIENCE_ACTIVE_SEASON_ID).trim() || SCIENCE_ACTIVE_SEASON_ID;
+const result = { problems: {}, userStats: {}, history: [], seasonHistory: [], ranking: [], currentStreak: 0, maxStreak: 0, quitCount: 0, sheetOrder: [], imageMap: [] };
 result.config = {
   appUrl: runtimeConfig.appUrl || "",
   perSetPerfectCap: Number(runtimeConfig.perSetPerfectCap) || 5,
@@ -525,7 +538,15 @@ result.config = {
   announcementEnabled: !!runtimeConfig.announcementEnabled,
   announcementText: runtimeConfig.announcementText || "",
   announcementUpdatedAt: runtimeConfig.announcementUpdatedAt || "",
-  hiddenProblemSheets: runtimeConfig.hiddenProblemSheets || []
+  hiddenProblemSheets: runtimeConfig.hiddenProblemSheets || [],
+  activeSeasonId: activeSeasonId
+};
+result.lifetimeSummary = {
+  activeSeasonId: activeSeasonId,
+  totalExp: 0,
+  sessionCount: 0,
+  seasonExp: 0,
+  seasonSessionCount: 0
 };
 result.imageMap = readImageMapFromSheet(ss);
 
@@ -634,6 +655,11 @@ if (historySheet) {
   const hValues = historySheet.getDataRange().getValues();
   const hDisp = historySheet.getDataRange().getDisplayValues();
   const userFullMap = {};
+  const userSeasonHistory = [];
+  const parseIntFromCell = function(raw, display) {
+    if (typeof raw === 'number') return Math.floor(raw) || 0;
+    return parseInt(String(display || raw || '').replace(/[^0-9-]/g, '')) || 0;
+  };
   
   // 履歴データを時系列でソートするための配列を作成
   const historyRows = [];
@@ -688,6 +714,10 @@ if (historySheet) {
     
     const avg10 = hasClassColumn ? String(hDispRow[11] || '') : String(hDispRow[9] || '');
     const overall = hasClassColumn ? String(hDispRow[12] || '') : String(hDispRow[10] || '');
+    const gainedExpIndex = hasClassColumn ? 9 : 8;
+    const gainedExp = parseIntFromCell(hVal[gainedExpIndex], hDispRow[gainedExpIndex]);
+    const seasonId = String(hDispRow[20] || '').trim();
+    const isCurrentSeason = seasonId === activeSeasonId;
     
     // 公開設定の位置: 新形式では列15（index 14）、旧形式では列13（index 12）
     const isPublicIndex = hasClassColumn ? 14 : 12;
@@ -708,49 +738,76 @@ if (historySheet) {
     // 自分の履歴を追加
     if (uId === String(userId)) {
       const sParts = String(hDispRow[4] || '').split('/');
-      result.history.push({ 
+      const historyEntry = { 
         date: String(hDispRow[0] || '').split(' ')[0].substring(5),
         score: String(hDispRow[3] || ''), 
         correctCount: parseInt(sParts[0]) || 0, 
         totalQ: parseInt(sParts[1]) || 10,
         timestamp: row.timestamp,
         totalExp: exp, 
+        gainedExp: gainedExp,
         avg10: avg10, 
         overallAcc: overall,
         summaryEra: String(hDispRow[1] || ''), // 単元（分野名）
-        summaryRange: String(hDispRow[2] || '') // 範囲（例：「1-10」）
-      });
+        summaryRange: String(hDispRow[2] || ''), // 範囲（例：「1-10」）
+        seasonId: seasonId
+      };
+      result.history.push(historyEntry);
+      result.lifetimeSummary.sessionCount += 1;
+      if (!result.lifetimeSummary.latestTimestamp || row.timestamp > result.lifetimeSummary.latestTimestamp) {
+        result.lifetimeSummary.latestTimestamp = row.timestamp;
+        result.lifetimeSummary.totalExp = exp;
+      }
+      if (isCurrentSeason) {
+        userSeasonHistory.push(historyEntry);
+      }
     }
     
     // ランキング用：公開設定が1（公開）のユーザーのみ収集
-    // 各ユーザーの最新レコードのみを使用（既に時系列順にソート済み）
-    if (isPublic && !userFullMap[uId]) {
-      const sessionCountIndex = hasClassColumn ? 15 : 13;
+    // 現在シーズンの公開レコードのみを使用し、EXPと回数はシーズン内で集計する
+    if (isPublic && isCurrentSeason) {
       const lastAttemptDateIndex = hasClassColumn ? 16 : 14;
       const statusIndex = hasClassColumn ? 17 : 15;
       
-      // セッション数の取得
-      let sessionCount = 0;
-      if (typeof hVal[sessionCountIndex] === 'number') {
-        sessionCount = Math.floor(hVal[sessionCountIndex]) || 0;
-      } else {
-        sessionCount = parseInt(String(hDispRow[sessionCountIndex] || '').replace(/[^0-9]/g, '')) || 0;
-      }
-      
       const lastAttemptDate = String(hDispRow[lastAttemptDateIndex] || '').trim();
       const userStatus = String(hDispRow[statusIndex] || '').trim();
-      
-      userFullMap[uId] = {
-        name: uName, 
-        exp: exp, 
-        avg10: avg10, 
-        overall: overall,
-        count: sessionCount,
-        lastAttemptDate: lastAttemptDate,
-        status: userStatus
-      };
+      if (!userFullMap[uId]) {
+        userFullMap[uId] = {
+          name: uName,
+          exp: 0,
+          avg10: avg10,
+          overall: overall,
+          count: 0,
+          lastAttemptDate: lastAttemptDate,
+          status: userStatus,
+          latestTimestamp: row.timestamp
+        };
+      }
+      userFullMap[uId].exp += gainedExp;
+      userFullMap[uId].count += 1;
+      if (row.timestamp >= (userFullMap[uId].latestTimestamp || 0)) {
+        userFullMap[uId].avg10 = avg10;
+        userFullMap[uId].overall = overall;
+        userFullMap[uId].lastAttemptDate = lastAttemptDate;
+        userFullMap[uId].status = userStatus;
+        userFullMap[uId].latestTimestamp = row.timestamp;
+      }
     }
   }
+
+  let runningSeasonExp = 0;
+  result.seasonHistory = userSeasonHistory
+    .sort(function(a, b) { return a.timestamp - b.timestamp; })
+    .map(function(entry) {
+      runningSeasonExp += parseInt(entry.gainedExp, 10) || 0;
+      const copied = Object.assign({}, entry);
+      copied.totalExp = runningSeasonExp;
+      copied.seasonExp = runningSeasonExp;
+      return copied;
+    })
+    .sort(function(a, b) { return b.timestamp - a.timestamp; });
+  result.lifetimeSummary.seasonExp = runningSeasonExp;
+  result.lifetimeSummary.seasonSessionCount = result.seasonHistory.length;
   
   const quitCountMap = buildQuitCountMap(ss);
   Object.keys(userFullMap).forEach(uId => {
@@ -955,6 +1012,25 @@ function upsertConfigValue(ss, key, value) {
   sheet.appendRow([key, value]);
 }
 
+function ensureDefaultConfigRows(ss) {
+  let sheet = ss.getSheetByName("設定");
+  if (!sheet) {
+    sheet = ss.insertSheet("設定");
+    sheet.getRange(1, 1, 1, 4).setValues([["key", "value", "説明", "備考"]]);
+    sheet.getRange(1, 1, 1, 4).setBackground("#f3f3f3").setFontWeight("bold");
+    sheet.setFrozenRows(1);
+  }
+  const values = sheet.getDataRange().getDisplayValues();
+  const existing = {};
+  values.forEach(function(row) {
+    const key = String(row[0] || '').trim();
+    if (key) existing[key] = true;
+  });
+  if (!existing.activeSeasonId) {
+    sheet.appendRow(["activeSeasonId", SCIENCE_ACTIVE_SEASON_ID, "現在のシーズンID。ホーム画面の今期EXP・今期演習・今期ランキングの集計に使う。", "試験後にリセットしたい場合は新しいIDへ変更する"]);
+  }
+}
+
 function parseUserIdParts(userId) {
   const parts = String(userId || '').split('-');
   return {
@@ -990,6 +1066,7 @@ function handleGetAdminStatus(p) {
     const opened = getSpreadsheetFromAdminParams(p);
     if (opened.error) return returnJson({ status: "error", message: opened.error });
     const ss = opened.ss;
+    ensureDefaultConfigRows(ss);
     const runtimeConfig = readRuntimeConfigFromSheet(ss);
     const auth = ensureAdminAuthorized(ss, p.adminKey);
     return returnJson({
@@ -1007,7 +1084,8 @@ function handleGetAdminStatus(p) {
         perSetPerfectCap: Number(runtimeConfig.perSetPerfectCap) || 5,
         dailyGrantLimit: Number(runtimeConfig.dailyGrantLimit) || 3,
         duplicateLogWindowSec: Number(runtimeConfig.duplicateLogWindowSec) || 60,
-        hiddenProblemSheets: runtimeConfig.hiddenProblemSheets || []
+        hiddenProblemSheets: runtimeConfig.hiddenProblemSheets || [],
+        activeSeasonId: runtimeConfig.activeSeasonId || SCIENCE_ACTIVE_SEASON_ID
       },
       problemSheets: listProblemSheetStatus(ss, runtimeConfig)
     });
@@ -1072,7 +1150,8 @@ function handleUpdateAdminSettings(p) {
         perSetPerfectCap: Number(runtimeConfig.perSetPerfectCap) || 5,
         dailyGrantLimit: Number(runtimeConfig.dailyGrantLimit) || 3,
         duplicateLogWindowSec: Number(runtimeConfig.duplicateLogWindowSec) || 60,
-        hiddenProblemSheets: runtimeConfig.hiddenProblemSheets || []
+        hiddenProblemSheets: runtimeConfig.hiddenProblemSheets || [],
+        activeSeasonId: runtimeConfig.activeSeasonId || SCIENCE_ACTIVE_SEASON_ID
       },
       problemSheets: listProblemSheetStatus(ss, runtimeConfig)
     });
@@ -1322,7 +1401,7 @@ try {
   );
   const windowMs = duplicateWindowSec * 1000;
 
-  const historyHeaders = ["日時", "単元", "範囲", "正解率", "スコア", "ユーザー名", "ユーザーID", "クラス", "番号", "取得EXP", "累計EXP", "10回平均正解率", "通算正答率", "連続正解数", "公開設定", "セッション数", "最終取り組み日", "ステータス", "有効"];
+  const historyHeaders = getHistoryHeaders();
   const historySheet = getOrCreateSheet(ss, "履歴ログ", historyHeaders);
   const data = historySheet.getDataRange().getValues();
   if (!data || data.length <= 1) {
