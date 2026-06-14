@@ -361,16 +361,23 @@
                             <div class="bg-slate-900/50 p-2 md:p-3 rounded-xl border border-white/5 text-center"><p class="text-[8px] text-slate-300 mb-0.5 uppercase font-bold">最大連続</p><p id="max-streak-display" class="text-sm md:text-lg font-flashy text-cyan-400">0</p></div>
                             <div class="bg-slate-900/50 p-2 md:p-3 rounded-xl border border-white/5 text-center"><p class="text-[8px] text-slate-300 mb-0.5 uppercase font-bold">Quit</p><p id="quit-count-display" class="text-sm md:text-lg font-flashy text-rose-300">0</p></div>
                         </div>
-                        <details id="ranking-card-wrapper" class="ranking-card space-y-2">
-                            <summary class="cursor-pointer text-[10px] font-black text-amber-400 uppercase italic flex items-center justify-between gap-2 mb-3">
+                        <div id="ranking-card-wrapper" class="ranking-card space-y-2">
+                            <h3 class="text-[10px] font-black text-amber-400 uppercase italic flex items-center justify-between gap-2 mb-3">
                                 <span><i class="fas fa-trophy"></i> Season Top Scholars</span>
                                 <span id="ranking-summary-count" class="text-[9px] text-white/35 normal-case">0 users</span>
-                            </summary>
+                            </h3>
                             <div id="ranking-header" class="grid gap-3 items-center text-[8px] font-black text-white/40 uppercase border-b border-white/10 pb-1.5 mb-1" style="grid-template-columns: 30px auto 50px 35px 70px 70px 40px 50px 50px 140px auto;">
                                 <span class="text-center">RK</span><span>NAME</span><span class="text-left">EXP</span><span class="text-left">LV</span><span class="text-left">10th Ave.</span><span class="text-left">ALL Ave.</span><span class="text-left">SESS</span><span class="text-left">CST</span><span class="text-left">MST</span><span class="text-left">LAST</span><span class="text-left">STATUS</span>
                             </div>
                             <div id="ranking-container" class="space-y-1"></div>
-                        </details>
+                            <details id="past-season-rankings-panel" class="mt-4 border-t border-white/10 pt-3">
+                                <summary class="cursor-pointer text-[10px] font-black text-slate-300 uppercase italic flex items-center justify-between gap-2">
+                                    <span><i class="fas fa-history"></i> Past Season Top Scholars</span>
+                                    <span id="past-season-ranking-count" class="text-[9px] text-white/35 normal-case">0 seasons</span>
+                                </summary>
+                                <div id="past-season-rankings-container" class="space-y-3 pt-3"></div>
+                            </details>
+                        </div>
                     </div>
                     <div id="daily-stats-container" class="glass-panel rounded-[1.5rem] md:rounded-[2.5rem] p-4 md:p-6 space-y-3 max-h-[200px] overflow-y-auto"></div>
                 </div>
@@ -613,6 +620,7 @@
         let lifetimeSummaryState = { totalExp: 0, sessionCount: 0, seasonExp: 0, seasonSessionCount: 0 };
         let questionStats = {};
         let rankingData = [];
+        let pastSeasonRankings = [];
         let selectedGoal = 80;
         let runtimeConfigState = null;
         let imageMapById = {};
@@ -1678,6 +1686,50 @@
             }
         }
 
+        function renderPastSeasonRankings() {
+            const panel = getEl('past-season-rankings-panel');
+            const countEl = getEl('past-season-ranking-count');
+            const container = getEl('past-season-rankings-container');
+            if (!panel || !countEl || !container) return;
+
+            const seasons = Array.isArray(pastSeasonRankings) ? pastSeasonRankings : [];
+            countEl.innerText = `${seasons.length} season${seasons.length === 1 ? '' : 's'}`;
+            if (seasons.length === 0) {
+                container.innerHTML = '<div class="text-center text-[9px] text-slate-500/70 py-3 italic">No past season ranking yet</div>';
+                return;
+            }
+
+            container.innerHTML = seasons.map((season) => {
+                const label = escapeHtmlAttribute(season.label || season.seasonId || 'Past Season');
+                const entries = Array.isArray(season.ranking) ? season.ranking : [];
+                const rows = entries.slice(0, 10).map((r, i) => {
+                    const name = escapeHtmlAttribute(r.name || r.dbName || r.userName || '--');
+                    const exp = Number(r.exp) || 0;
+                    const count = Number(r.count) || 0;
+                    const rLv = Math.floor(exp / 10);
+                    const latest = escapeHtmlAttribute(String(r.lastAttemptDate || '').split(' ')[0] || '--');
+                    return `<div class="grid grid-cols-[28px_1fr_56px_44px_56px_92px] gap-2 items-center text-[9px] text-slate-300 py-1.5 border-b border-white/5 last:border-0">
+                        <span class="text-center opacity-50 font-black">${i + 1}</span>
+                        <span class="font-bold text-white truncate">${name}</span>
+                        <span class="font-flashy text-indigo-300">${exp}</span>
+                        <span class="font-flashy text-emerald-300">${String(rLv).padStart(2, '0')}</span>
+                        <span class="font-flashy text-cyan-300">${count}</span>
+                        <span class="text-slate-400">${latest}</span>
+                    </div>`;
+                }).join('');
+                return `<div class="bg-black/20 rounded-xl border border-white/10 p-3">
+                    <div class="flex items-center justify-between gap-2 mb-2">
+                        <div class="text-[10px] font-black text-slate-200">${label}</div>
+                        <div class="text-[9px] text-white/35">${entries.length} users</div>
+                    </div>
+                    <div class="grid grid-cols-[28px_1fr_56px_44px_56px_92px] gap-2 items-center text-[8px] font-black text-white/35 uppercase border-b border-white/10 pb-1 mb-1">
+                        <span class="text-center">RK</span><span>NAME</span><span>EXP</span><span>LV</span><span>SESS</span><span>LAST</span>
+                    </div>
+                    ${rows || '<div class="text-center text-[9px] text-slate-500/70 py-2 italic">No public users</div>'}
+                </div>`;
+            }).join('');
+        }
+
         function updateStatsUI() {
             try {
                 const sorted = [...userHistory].sort((a,b) => b.timestamp - a.timestamp);
@@ -2023,6 +2075,7 @@
                         // データがない場合のメッセージ
                         rankCont.innerHTML = '<div class="text-center text-[9px] text-slate-500/70 py-4 italic">No ranking data available</div>';
                     }
+                    renderPastSeasonRankings();
                     
                     // 日付ごとの問題数と正答率を計算・表示（別の枠内で一番下に配置）
                     const dailyStatsEl = getEl('daily-stats-container');
@@ -2984,6 +3037,7 @@
                 cumulativeHistory = Array.isArray(result.history) ? result.history : [];
                 userHistory = Array.isArray(result.seasonHistory) ? result.seasonHistory : cumulativeHistory;
                 lifetimeSummaryState = result.lifetimeSummary || { totalExp: 0, sessionCount: cumulativeHistory.length, seasonExp: 0, seasonSessionCount: userHistory.length };
+                pastSeasonRankings = Array.isArray(result.pastSeasonRankings) ? result.pastSeasonRankings : [];
                 if(result.ranking) {
                     rankingData = result.ranking;
                     console.log('ランキングデータ:', rankingData);

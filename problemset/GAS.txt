@@ -528,7 +528,7 @@ try {
 ensureDefaultConfigRows(ss);
 const runtimeConfig = readRuntimeConfigFromSheet(ss);
 const activeSeasonId = String(runtimeConfig.activeSeasonId || SCIENCE_ACTIVE_SEASON_ID).trim() || SCIENCE_ACTIVE_SEASON_ID;
-const result = { problems: {}, userStats: {}, history: [], seasonHistory: [], ranking: [], currentStreak: 0, maxStreak: 0, quitCount: 0, sheetOrder: [], imageMap: [] };
+const result = { problems: {}, userStats: {}, history: [], seasonHistory: [], ranking: [], pastSeasonRankings: [], currentStreak: 0, maxStreak: 0, quitCount: 0, sheetOrder: [], imageMap: [] };
 result.config = {
   appUrl: runtimeConfig.appUrl || "",
   perSetPerfectCap: Number(runtimeConfig.perSetPerfectCap) || 5,
@@ -655,10 +655,35 @@ if (historySheet) {
   const hValues = historySheet.getDataRange().getValues();
   const hDisp = historySheet.getDataRange().getDisplayValues();
   const userFullMap = {};
+  const pastSeasonRankMap = {};
+  const pastSeasonMeta = {};
   const userSeasonHistory = [];
   const parseIntFromCell = function(raw, display) {
     if (typeof raw === 'number') return Math.floor(raw) || 0;
     return parseInt(String(display || raw || '').replace(/[^0-9-]/g, '')) || 0;
+  };
+  const addRankingEntry = function(targetMap, uId, uName, gainedExp, avg10, overall, lastAttemptDate, userStatus, timestamp) {
+    if (!targetMap[uId]) {
+      targetMap[uId] = {
+        name: uName,
+        exp: 0,
+        avg10: avg10,
+        overall: overall,
+        count: 0,
+        lastAttemptDate: lastAttemptDate,
+        status: userStatus,
+        latestTimestamp: timestamp
+      };
+    }
+    targetMap[uId].exp += gainedExp;
+    targetMap[uId].count += 1;
+    if (timestamp >= (targetMap[uId].latestTimestamp || 0)) {
+      targetMap[uId].avg10 = avg10;
+      targetMap[uId].overall = overall;
+      targetMap[uId].lastAttemptDate = lastAttemptDate;
+      targetMap[uId].status = userStatus;
+      targetMap[uId].latestTimestamp = timestamp;
+    }
   };
   
   // 履歴データを時系列でソートするための配列を作成
@@ -764,33 +789,29 @@ if (historySheet) {
     }
     
     // ランキング用：公開設定が1（公開）のユーザーのみ収集
-    // 現在シーズンの公開レコードのみを使用し、EXPと回数はシーズン内で集計する
-    if (isPublic && isCurrentSeason) {
+    // 現在シーズンは通常表示、過去シーズンはシーズン別に折りたたみ表示する。
+    if (isPublic) {
       const lastAttemptDateIndex = hasClassColumn ? 16 : 14;
       const statusIndex = hasClassColumn ? 17 : 15;
       
       const lastAttemptDate = String(hDispRow[lastAttemptDateIndex] || '').trim();
       const userStatus = String(hDispRow[statusIndex] || '').trim();
-      if (!userFullMap[uId]) {
-        userFullMap[uId] = {
-          name: uName,
-          exp: 0,
-          avg10: avg10,
-          overall: overall,
-          count: 0,
-          lastAttemptDate: lastAttemptDate,
-          status: userStatus,
-          latestTimestamp: row.timestamp
-        };
-      }
-      userFullMap[uId].exp += gainedExp;
-      userFullMap[uId].count += 1;
-      if (row.timestamp >= (userFullMap[uId].latestTimestamp || 0)) {
-        userFullMap[uId].avg10 = avg10;
-        userFullMap[uId].overall = overall;
-        userFullMap[uId].lastAttemptDate = lastAttemptDate;
-        userFullMap[uId].status = userStatus;
-        userFullMap[uId].latestTimestamp = row.timestamp;
+      if (isCurrentSeason) {
+        addRankingEntry(userFullMap, uId, uName, gainedExp, avg10, overall, lastAttemptDate, userStatus, row.timestamp);
+      } else {
+        const pastSeasonKey = seasonId || "__legacy__";
+        if (!pastSeasonRankMap[pastSeasonKey]) {
+          pastSeasonRankMap[pastSeasonKey] = {};
+          pastSeasonMeta[pastSeasonKey] = {
+            seasonId: seasonId || "",
+            label: seasonId || "過去ログ",
+            latestTimestamp: row.timestamp
+          };
+        }
+        addRankingEntry(pastSeasonRankMap[pastSeasonKey], uId, uName, gainedExp, avg10, overall, lastAttemptDate, userStatus, row.timestamp);
+        if (row.timestamp > (pastSeasonMeta[pastSeasonKey].latestTimestamp || 0)) {
+          pastSeasonMeta[pastSeasonKey].latestTimestamp = row.timestamp;
+        }
       }
     }
   }
@@ -875,6 +896,18 @@ if (historySheet) {
   }
   
   result.ranking = Object.values(userFullMap).sort((a, b) => b.exp - a.exp); // 全参加者を返す
+  result.pastSeasonRankings = Object.keys(pastSeasonRankMap)
+    .map(function(seasonKey) {
+      const meta = pastSeasonMeta[seasonKey] || {};
+      return {
+        seasonId: meta.seasonId || "",
+        label: meta.label || "過去ログ",
+        latestTimestamp: meta.latestTimestamp || 0,
+        ranking: Object.values(pastSeasonRankMap[seasonKey]).sort(function(a, b) { return b.exp - a.exp; })
+      };
+    })
+    .filter(function(season) { return season.ranking && season.ranking.length > 0; })
+    .sort(function(a, b) { return (b.latestTimestamp || 0) - (a.latestTimestamp || 0); });
 }
 
 // 連続正解数の取得（詳細履歴ログから直接計算）
