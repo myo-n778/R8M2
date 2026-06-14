@@ -145,7 +145,6 @@
         #status-modal { z-index: 12000; }
         
         .neural-level-badge { background: linear-gradient(135deg, var(--accent-primary), #a855f7); color: white; padding: 2px 10px; border-radius: 4px; font-family: 'Orbitron', sans-serif; font-size: 10px; font-weight: 900; }
-        /* ランキングの横スクロール対応案1 (CSSのみで解決) */
         .ranking-card { 
             background: rgba(255, 255, 255, 0.03); 
             border: 1px solid rgba(255, 255, 255, 0.05); 
@@ -153,7 +152,7 @@
             padding: 0.75rem; 
             margin-top: 1rem; 
             box-shadow: none !important;
-            overflow-x: auto;
+            overflow-x: hidden;
             overflow-y: auto;
             max-height: 400px;
             scrollbar-width: thin;
@@ -162,8 +161,17 @@
         .ranking-card::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 10px; }
         .ranking-card::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.02); }
         
-        /* 中のグリッドが適切な幅になるように固定（status列まで含めて広めに設定） */
-        .ranking-card .grid { 
+        .ranking-table-scroll {
+            width: 100%;
+            overflow-x: auto;
+            overflow-y: hidden;
+            padding-bottom: 0.25rem;
+            scrollbar-width: thin;
+        }
+        .ranking-table-scroll::-webkit-scrollbar { height: 4px; }
+        .ranking-table-scroll::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.16); border-radius: 10px; }
+        .ranking-table-scroll::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.03); }
+        .ranking-table-scroll .grid { 
             min-width: 1000px; 
         }
         /* status列の横スクロール対応 */
@@ -366,10 +374,12 @@
                                 <span><i class="fas fa-trophy"></i> Season Top Scholars</span>
                                 <span id="ranking-summary-count" class="text-[9px] text-white/35 normal-case">0 users</span>
                             </h3>
-                            <div id="ranking-header" class="grid gap-3 items-center text-[8px] font-black text-white/40 uppercase border-b border-white/10 pb-1.5 mb-1" style="grid-template-columns: 30px auto 50px 35px 70px 70px 40px 50px 50px 140px auto;">
-                                <span class="text-center">RK</span><span>NAME</span><span class="text-left">EXP</span><span class="text-left">LV</span><span class="text-left">10th Ave.</span><span class="text-left">ALL Ave.</span><span class="text-left">SESS</span><span class="text-left">CST</span><span class="text-left">MST</span><span class="text-left">LAST</span><span class="text-left">STATUS</span>
+                            <div class="ranking-table-scroll">
+                                <div id="ranking-header" class="grid gap-3 items-center text-[8px] font-black text-white/40 uppercase border-b border-white/10 pb-1.5 mb-1" style="grid-template-columns: 30px auto 50px 35px 70px 70px 40px 50px 50px 140px auto;">
+                                    <span class="text-center">RK</span><span>NAME</span><span class="text-left">EXP</span><span class="text-left">LV</span><span class="text-left">10th Ave.</span><span class="text-left">ALL Ave.</span><span class="text-left">SESS</span><span class="text-left">CST</span><span class="text-left">MST</span><span class="text-left">LAST</span><span class="text-left">STATUS</span>
+                                </div>
+                                <div id="ranking-container" class="space-y-1"></div>
                             </div>
-                            <div id="ranking-container" class="space-y-1"></div>
                             <details id="past-season-rankings-panel" class="mt-4 border-t border-white/10 pt-3">
                                 <summary class="cursor-pointer text-[10px] font-black text-slate-300 uppercase italic flex items-center justify-between gap-2">
                                     <span><i class="fas fa-history"></i> Past Season Top Scholars</span>
@@ -1840,8 +1850,10 @@
                         <div class="text-[10px] font-black text-slate-200">${label}</div>
                         <div class="text-[9px] text-white/35">${entries.length} users</div>
                     </div>
-                    ${createRankingHeaderHtml()}
-                    <div id="past-season-ranking-rows-${seasonIndex}" class="space-y-1"></div>
+                    <div class="ranking-table-scroll">
+                        ${createRankingHeaderHtml()}
+                        <div id="past-season-ranking-rows-${seasonIndex}" class="space-y-1"></div>
+                    </div>
                 </div>`;
             }).join('');
 
@@ -1869,7 +1881,7 @@
                 container.innerHTML = '';
                 return;
             }
-            container.innerHTML = `${createRankingHeaderHtml()}<div id="lifetime-ranking-rows" class="space-y-1"></div>`;
+            container.innerHTML = `<div class="ranking-table-scroll">${createRankingHeaderHtml()}<div id="lifetime-ranking-rows" class="space-y-1"></div></div>`;
             const rowsEl = getEl('lifetime-ranking-rows');
             const headerEl = rowsEl ? rowsEl.previousElementSibling : null;
             renderRankingTable(rowsEl, entries, {
