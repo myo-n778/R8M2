@@ -377,6 +377,13 @@
                                 </summary>
                                 <div id="past-season-rankings-container" class="space-y-3 pt-3"></div>
                             </details>
+                            <details id="lifetime-ranking-panel" class="mt-4 border-t border-white/10 pt-3">
+                                <summary class="cursor-pointer text-[10px] font-black text-slate-300 uppercase italic flex items-center justify-between gap-2">
+                                    <span><i class="fas fa-medal"></i> Lifetime Scholars</span>
+                                    <span id="lifetime-ranking-count" class="text-[9px] text-white/35 normal-case">0 users</span>
+                                </summary>
+                                <div id="lifetime-ranking-container" class="space-y-2 pt-3"></div>
+                            </details>
                         </div>
                     </div>
                     <div id="daily-stats-container" class="glass-panel rounded-[1.5rem] md:rounded-[2.5rem] p-4 md:p-6 space-y-3 max-h-[200px] overflow-y-auto"></div>
@@ -621,6 +628,7 @@
         let questionStats = {};
         let rankingData = [];
         let pastSeasonRankings = [];
+        let lifetimeRankingData = [];
         let selectedGoal = 80;
         let runtimeConfigState = null;
         let imageMapById = {};
@@ -1686,6 +1694,113 @@
             }
         }
 
+        function getRankingGridTemplate(nameWidth, statusWidth) {
+            return `30px ${nameWidth}px 50px 35px 70px 70px 40px 50px 50px 140px ${statusWidth}px`;
+        }
+
+        function createRankingHeaderHtml() {
+            return `<div class="grid gap-3 items-center text-[8px] font-black text-white/40 uppercase border-b border-white/10 pb-1.5 mb-1 ranking-table-header">
+                <span class="text-center">RK</span><span>NAME</span><span class="text-left">EXP</span><span class="text-left">LV</span><span class="text-left">10th Ave.</span><span class="text-left">ALL Ave.</span><span class="text-left">SESS</span><span class="text-left">CST</span><span class="text-left">MST</span><span class="text-left">LAST</span><span class="text-left">STATUS</span>
+            </div>`;
+        }
+
+        function measureRankingColumns(data) {
+            const entries = Array.isArray(data) ? data : [];
+            const tempSpan = document.createElement('span');
+            tempSpan.className = 'font-bold text-white whitespace-nowrap';
+            tempSpan.style.visibility = 'hidden';
+            tempSpan.style.position = 'absolute';
+            tempSpan.style.whiteSpace = 'nowrap';
+            document.body.appendChild(tempSpan);
+
+            let maxNameWidth = 0;
+            entries.forEach((r) => {
+                const userNameDisplay = r.name || r.dbName || r.userName || r.user_name || '--';
+                tempSpan.textContent = String(userNameDisplay);
+                maxNameWidth = Math.max(maxNameWidth, tempSpan.offsetWidth);
+            });
+            tempSpan.textContent = 'NAME';
+            maxNameWidth = Math.max(maxNameWidth, tempSpan.offsetWidth) + 20;
+
+            let maxStatusWidth = 0;
+            tempSpan.className = 'font-bold text-indigo-300';
+            entries.forEach((r) => {
+                const statusDisplay = (r.status || (r.name === USER_NAME ? USER_STATUS : '')) || '--';
+                tempSpan.textContent = String(statusDisplay);
+                maxStatusWidth = Math.max(maxStatusWidth, tempSpan.offsetWidth);
+            });
+            tempSpan.textContent = 'STATUS';
+            maxStatusWidth = Math.max(maxStatusWidth, tempSpan.offsetWidth) + 20;
+            maxStatusWidth = Math.max(150, Math.min(300, maxStatusWidth));
+
+            document.body.removeChild(tempSpan);
+            return { maxNameWidth, maxStatusWidth };
+        }
+
+        function getRankingLastDateDisplay(r, isMe, historyForMe = userHistory) {
+            if (isMe && historyForMe && historyForMe.length > 0) {
+                const sortedUserHistory = [...historyForMe].sort((a, b) => b.timestamp - a.timestamp);
+                const latestEntry = sortedUserHistory[0];
+                if (latestEntry && latestEntry.timestamp) {
+                    const date = new Date(latestEntry.timestamp);
+                    const year = date.getFullYear();
+                    const month = String(date.getMonth() + 1).padStart(2, '0');
+                    const day = String(date.getDate()).padStart(2, '0');
+                    return `${year}/${month}/${day}`;
+                }
+            }
+            if (r.lastAttemptDate) {
+                return String(r.lastAttemptDate).split(' ')[0] || '--';
+            }
+            return '--';
+        }
+
+        function renderRankingTable(target, data, options = {}) {
+            const container = typeof target === 'string' ? getEl(target) : target;
+            if (!container) return null;
+            const entries = Array.isArray(data) ? data : [];
+            const headerEl = options.headerEl || null;
+            const historyForMe = options.historyForMe || userHistory;
+            const emptyMessage = options.emptyMessage || 'No ranking data available';
+
+            if (entries.length === 0) {
+                if (headerEl) headerEl.style.display = 'grid';
+                container.innerHTML = `<div class="text-center text-[9px] text-slate-500/70 py-4 italic">${emptyMessage}</div>`;
+                return null;
+            }
+
+            const { maxNameWidth, maxStatusWidth } = measureRankingColumns(entries);
+            const gridTemplate = getRankingGridTemplate(maxNameWidth, maxStatusWidth);
+            if (headerEl) {
+                headerEl.style.display = 'grid';
+                headerEl.style.gridTemplateColumns = gridTemplate;
+            }
+
+            container.innerHTML = entries.map((r, i) => {
+                const exp = Number(r.exp) || 0;
+                const rLv = Math.floor(exp / 10);
+                const userNameDisplay = r.name || r.dbName || r.userName || r.user_name || '--';
+                const isMe = userNameDisplay === USER_NAME;
+                const lastDateDisplay = getRankingLastDateDisplay(r, isMe, historyForMe);
+                const statusDisplay = escapeHtmlAttribute((r.status || (isMe ? USER_STATUS : '')) || '--');
+                const finalUserName = escapeHtmlAttribute(r.name || r.dbName || userNameDisplay || 'Unknown');
+                return `<div class="grid gap-3 items-center text-[10px] py-1.5 border-b border-white/5 last:border-0 ${isMe ? 'text-amber-300 bg-white/5 font-bold' : 'text-slate-200'}" style="grid-template-columns: ${gridTemplate};">
+                    <span class="opacity-40 font-black text-center">${i + 1}</span>
+                    <span class="font-bold text-white whitespace-nowrap" style="min-width: 0;">${finalUserName}</span>
+                    <span class="text-left font-flashy text-[9px] text-indigo-400">${exp}</span>
+                    <span class="text-left font-flashy text-[9px] text-emerald-400">${String(rLv).padStart(2, '0')}</span>
+                    <span class="text-left font-flashy text-[9px] text-orange-400">${r.avg10 || '--%'}</span>
+                    <span class="text-left font-flashy text-[9px] text-cyan-400">${r.overall || '--%'}</span>
+                    <span class="text-left font-flashy opacity-60 text-[9px]">${r.count || 0}</span>
+                    <span class="text-left font-flashy text-[9px] text-amber-400">${(r.currentStreak !== undefined && r.currentStreak !== null) ? r.currentStreak : '--'}</span>
+                    <span class="text-left font-flashy text-[9px] text-cyan-400">${(r.maxStreak !== undefined && r.maxStreak !== null) ? r.maxStreak : '--'}</span>
+                    <span class="text-left font-flashy text-[9px] text-slate-200 opacity-90">${escapeHtmlAttribute(lastDateDisplay)}</span>
+                    <span class="text-left font-bold text-[10px] text-indigo-300 ranking-status-cell" style="min-width: ${maxStatusWidth}px; max-width: ${maxStatusWidth}px;" title="${statusDisplay}">${statusDisplay}</span>
+                </div>`;
+            }).join('');
+            return { gridTemplate };
+        }
+
         function renderPastSeasonRankings() {
             const panel = getEl('past-season-rankings-panel');
             const countEl = getEl('past-season-ranking-count');
@@ -1699,35 +1814,46 @@
                 return;
             }
 
-            container.innerHTML = seasons.map((season) => {
+            container.innerHTML = seasons.map((season, seasonIndex) => {
                 const label = escapeHtmlAttribute(season.label || season.seasonId || 'Past Season');
                 const entries = Array.isArray(season.ranking) ? season.ranking : [];
-                const rows = entries.slice(0, 10).map((r, i) => {
-                    const name = escapeHtmlAttribute(r.name || r.dbName || r.userName || '--');
-                    const exp = Number(r.exp) || 0;
-                    const count = Number(r.count) || 0;
-                    const rLv = Math.floor(exp / 10);
-                    const latest = escapeHtmlAttribute(String(r.lastAttemptDate || '').split(' ')[0] || '--');
-                    return `<div class="grid grid-cols-[28px_1fr_56px_44px_56px_92px] gap-2 items-center text-[9px] text-slate-300 py-1.5 border-b border-white/5 last:border-0">
-                        <span class="text-center opacity-50 font-black">${i + 1}</span>
-                        <span class="font-bold text-white truncate">${name}</span>
-                        <span class="font-flashy text-indigo-300">${exp}</span>
-                        <span class="font-flashy text-emerald-300">${String(rLv).padStart(2, '0')}</span>
-                        <span class="font-flashy text-cyan-300">${count}</span>
-                        <span class="text-slate-400">${latest}</span>
-                    </div>`;
-                }).join('');
                 return `<div class="bg-black/20 rounded-xl border border-white/10 p-3">
                     <div class="flex items-center justify-between gap-2 mb-2">
                         <div class="text-[10px] font-black text-slate-200">${label}</div>
                         <div class="text-[9px] text-white/35">${entries.length} users</div>
                     </div>
-                    <div class="grid grid-cols-[28px_1fr_56px_44px_56px_92px] gap-2 items-center text-[8px] font-black text-white/35 uppercase border-b border-white/10 pb-1 mb-1">
-                        <span class="text-center">RK</span><span>NAME</span><span>EXP</span><span>LV</span><span>SESS</span><span>LAST</span>
-                    </div>
-                    ${rows || '<div class="text-center text-[9px] text-slate-500/70 py-2 italic">No public users</div>'}
+                    ${createRankingHeaderHtml()}
+                    <div id="past-season-ranking-rows-${seasonIndex}" class="space-y-1"></div>
                 </div>`;
             }).join('');
+
+            seasons.forEach((season, seasonIndex) => {
+                const seasonBlock = getEl(`past-season-ranking-rows-${seasonIndex}`);
+                const headerEl = seasonBlock ? seasonBlock.previousElementSibling : null;
+                renderRankingTable(seasonBlock, season.ranking || [], {
+                    headerEl,
+                    historyForMe: cumulativeHistory,
+                    emptyMessage: 'No public users'
+                });
+            });
+        }
+
+        function renderLifetimeRanking() {
+            const panel = getEl('lifetime-ranking-panel');
+            const countEl = getEl('lifetime-ranking-count');
+            const container = getEl('lifetime-ranking-container');
+            if (!panel || !countEl || !container) return;
+
+            const entries = Array.isArray(lifetimeRankingData) ? lifetimeRankingData : [];
+            countEl.innerText = `${entries.length} users`;
+            container.innerHTML = `${createRankingHeaderHtml()}<div id="lifetime-ranking-rows" class="space-y-1"></div>`;
+            const rowsEl = getEl('lifetime-ranking-rows');
+            const headerEl = rowsEl ? rowsEl.previousElementSibling : null;
+            renderRankingTable(rowsEl, entries, {
+                headerEl,
+                historyForMe: cumulativeHistory,
+                emptyMessage: 'No lifetime ranking data available'
+            });
         }
 
         function updateStatsUI() {
@@ -1942,140 +2068,9 @@
                 if (rankCont) { 
                     // ランキングテーブルは常に表示（データがない場合でも）
                     if (rankWrapper) rankWrapper.style.display = '';
-                    if (rankHeader) rankHeader.style.display = 'grid';
-                    
-                    if (rankingData && rankingData.length > 0) {
-                        console.log('ランキング表示開始:', rankingData.length, '件');
-                        
-                        // 最大の名前の幅を計算するための一時的な要素を作成
-                        const tempSpan = document.createElement('span');
-                        tempSpan.className = 'font-bold text-white whitespace-nowrap';
-                        tempSpan.style.visibility = 'hidden';
-                        tempSpan.style.position = 'absolute';
-                        tempSpan.style.whiteSpace = 'nowrap';
-                        document.body.appendChild(tempSpan);
-                        
-                        let maxNameWidth = 0;
-                        rankingData.forEach((r) => {
-                            const userNameDisplay = r.name || r.dbName || r.userName || r.user_name || '--';
-                            tempSpan.textContent = String(userNameDisplay);
-                            const width = tempSpan.offsetWidth;
-                            if (width > maxNameWidth) {
-                                maxNameWidth = width;
-                            }
-                        });
-                        
-                        // 最小幅を確保（"NAME"ラベルの幅も考慮）
-                        tempSpan.textContent = 'NAME';
-                        const labelWidth = tempSpan.offsetWidth;
-                        if (labelWidth > maxNameWidth) {
-                            maxNameWidth = labelWidth;
-                        }
-                        
-                        // パディングとマージンを考慮して少し余裕を持たせる
-                        maxNameWidth += 20;
-                        
-                        // 最大のstatusメッセージの幅を計算（1行表示用）
-                        let maxStatusWidth = 0;
-                        tempSpan.className = 'font-bold text-indigo-300';
-                        tempSpan.style.whiteSpace = 'nowrap';
-                        tempSpan.style.width = 'auto';
-                        
-                        rankingData.forEach((r) => {
-                            const statusDisplay = (r.status || (r.name === USER_NAME ? USER_STATUS : '')) || '--';
-                            tempSpan.textContent = String(statusDisplay);
-                            const width = tempSpan.offsetWidth;
-                            if (width > maxStatusWidth) {
-                                maxStatusWidth = width;
-                            }
-                        });
-                        
-                        // 最小幅を確保（"STATUS"ラベルの幅も考慮）
-                        tempSpan.textContent = 'STATUS';
-                        const statusLabelWidth = tempSpan.offsetWidth;
-                        if (statusLabelWidth > maxStatusWidth) {
-                            maxStatusWidth = statusLabelWidth;
-                        }
-                        
-                        // パディングとマージンを考慮して少し余裕を持たせる
-                        maxStatusWidth += 20;
-                        // 最小幅を確保（短いメッセージでも見やすく）
-                        if (maxStatusWidth < 150) {
-                            maxStatusWidth = 150;
-                        }
-                        // 最大幅を制限（長すぎる場合は横スクロールで対応）
-                        if (maxStatusWidth > 300) {
-                            maxStatusWidth = 300;
-                        }
-                        
-                        document.body.removeChild(tempSpan);
-                        
-                        console.log('最大の名前の幅:', maxNameWidth, 'px');
-                        console.log('最大のstatusの幅:', maxStatusWidth, 'px');
-                        
-                        rankCont.innerHTML = rankingData.map((r, i) => {
-                            console.log(`ランキングエントリ ${i}:`, r);
-                            const rLv = Math.floor((r.exp || 0) / 10);
-                            // 名前の取得を複数のプロパティから試行
-                            const userNameDisplay = r.name || r.dbName || r.userName || r.user_name || '--';
-                            console.log(`エントリ ${i} の名前:`, userNameDisplay, '元データ:', {name: r.name, dbName: r.dbName, userName: r.userName, user_name: r.user_name});
-                            const isMe = userNameDisplay === USER_NAME;
-                            // 最終取り組み日（userHistoryから取得、年月日のみ、時刻はカット）
-                            let lastDateDisplay = '--';
-                            // 自分の場合はuserHistoryから取得（フロントページと同じロジック）
-                            if (isMe && userHistory && userHistory.length > 0) {
-                                const sortedUserHistory = [...userHistory].sort((a, b) => b.timestamp - a.timestamp);
-                                const latestEntry = sortedUserHistory[0];
-                                if (latestEntry && latestEntry.timestamp) {
-                                    const date = new Date(latestEntry.timestamp);
-                                    const year = date.getFullYear();
-                                    const month = String(date.getMonth() + 1).padStart(2, '0');
-                                    const day = String(date.getDate()).padStart(2, '0');
-                                    lastDateDisplay = `${year}/${month}/${day}`;
-                                }
-                            }
-                            // rankingDataからも試す（フォールバック）
-                            if (lastDateDisplay === '--' && r.lastAttemptDate) {
-                                const dateTimeStr = String(r.lastAttemptDate);
-                                const dateTimeParts = dateTimeStr.split(' ');
-                                if (dateTimeParts.length >= 1) {
-                                    lastDateDisplay = dateTimeParts[0]; // 日付部分のみ（時刻はカット）
-                                }
-                            }
-                            const statusDisplay = (r.status || (isMe ? USER_STATUS : '')) || '--';
-                            // 名前を直接取得（確実に表示されるように）
-                            const finalUserName = r.name || r.dbName || userNameDisplay || 'Unknown';
-                            console.log(`最終的な名前表示: "${finalUserName}"`);
-                            
-                            const rowHtml = `<div class="grid gap-3 items-center text-[10px] py-1.5 border-b border-white/5 last:border-0 ${isMe ? 'text-amber-300 bg-white/5 font-bold' : 'text-slate-200'}" style="grid-template-columns: 30px ${maxNameWidth}px 50px 35px 70px 70px 40px 50px 50px 140px ${maxStatusWidth}px;">
-                                <span class="opacity-40 font-black text-center">${i+1}</span>
-                                <span class="font-bold text-white whitespace-nowrap" style="min-width: 0;">${String(finalUserName)}</span>
-                                <span class="text-left font-flashy text-[9px] text-indigo-400">${r.exp || 0}</span>
-                                <span class="text-left font-flashy text-[9px] text-emerald-400">${String(rLv).padStart(2,'0')}</span>
-                                <span class="text-left font-flashy text-[9px] text-orange-400">${r.avg10 || '--%'}</span>
-                                <span class="text-left font-flashy text-[9px] text-cyan-400">${r.overall || '--%'}</span>
-                                <span class="text-left font-flashy opacity-60 text-[9px]">${r.count || 0}</span>
-                                <span class="text-left font-flashy text-[9px] text-amber-400">${(r.currentStreak !== undefined && r.currentStreak !== null) ? r.currentStreak : '--'}</span>
-                                <span class="text-left font-flashy text-[9px] text-cyan-400">${(r.maxStreak !== undefined && r.maxStreak !== null) ? r.maxStreak : '--'}</span>
-                                <span class="text-left font-flashy text-[9px] text-slate-200 opacity-90">${lastDateDisplay}</span>
-                                <span class="text-left font-bold text-[10px] text-indigo-300 ranking-status-cell" style="min-width: ${maxStatusWidth}px; max-width: ${maxStatusWidth}px;" title="${statusDisplay}">${statusDisplay}</span>
-                            </div>`;
-                            console.log(`生成されたHTML (${i}行目):`, rowHtml);
-                            return rowHtml;
-                        }).join('');
-                        
-                        // ヘッダーの列幅も同じ値に設定
-                        const headerEl = getEl('ranking-header');
-                        if (headerEl) {
-                            headerEl.style.gridTemplateColumns = `30px ${maxNameWidth}px 50px 35px 70px 70px 40px 50px 50px 140px ${maxStatusWidth}px`;
-                        }
-                        
-                        console.log('最終的なHTML:', rankCont.innerHTML.substring(0, 500));
-                    } else {
-                        // データがない場合のメッセージ
-                        rankCont.innerHTML = '<div class="text-center text-[9px] text-slate-500/70 py-4 italic">No ranking data available</div>';
-                    }
+                    renderRankingTable(rankCont, rankingData, { headerEl: rankHeader });
                     renderPastSeasonRankings();
+                    renderLifetimeRanking();
                     
                     // 日付ごとの問題数と正答率を計算・表示（別の枠内で一番下に配置）
                     const dailyStatsEl = getEl('daily-stats-container');
@@ -3038,6 +3033,7 @@
                 userHistory = Array.isArray(result.seasonHistory) ? result.seasonHistory : cumulativeHistory;
                 lifetimeSummaryState = result.lifetimeSummary || { totalExp: 0, sessionCount: cumulativeHistory.length, seasonExp: 0, seasonSessionCount: userHistory.length };
                 pastSeasonRankings = Array.isArray(result.pastSeasonRankings) ? result.pastSeasonRankings : [];
+                lifetimeRankingData = Array.isArray(result.lifetimeRanking) ? result.lifetimeRanking : [];
                 if(result.ranking) {
                     rankingData = result.ranking;
                     console.log('ランキングデータ:', rankingData);

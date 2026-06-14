@@ -528,7 +528,7 @@ try {
 ensureDefaultConfigRows(ss);
 const runtimeConfig = readRuntimeConfigFromSheet(ss);
 const activeSeasonId = String(runtimeConfig.activeSeasonId || SCIENCE_ACTIVE_SEASON_ID).trim() || SCIENCE_ACTIVE_SEASON_ID;
-const result = { problems: {}, userStats: {}, history: [], seasonHistory: [], ranking: [], pastSeasonRankings: [], currentStreak: 0, maxStreak: 0, quitCount: 0, sheetOrder: [], imageMap: [] };
+const result = { problems: {}, userStats: {}, history: [], seasonHistory: [], ranking: [], pastSeasonRankings: [], lifetimeRanking: [], currentStreak: 0, maxStreak: 0, quitCount: 0, sheetOrder: [], imageMap: [] };
 result.config = {
   appUrl: runtimeConfig.appUrl || "",
   perSetPerfectCap: Number(runtimeConfig.perSetPerfectCap) || 5,
@@ -657,6 +657,7 @@ if (historySheet) {
   const userFullMap = {};
   const pastSeasonRankMap = {};
   const pastSeasonMeta = {};
+  const lifetimeRankMap = {};
   const userSeasonHistory = [];
   const parseIntFromCell = function(raw, display) {
     if (typeof raw === 'number') return Math.floor(raw) || 0;
@@ -683,6 +684,29 @@ if (historySheet) {
       targetMap[uId].lastAttemptDate = lastAttemptDate;
       targetMap[uId].status = userStatus;
       targetMap[uId].latestTimestamp = timestamp;
+    }
+  };
+  const addLifetimeRankingEntry = function(uId, uName, totalExp, avg10, overall, lastAttemptDate, userStatus, timestamp) {
+    if (!lifetimeRankMap[uId]) {
+      lifetimeRankMap[uId] = {
+        name: uName,
+        exp: 0,
+        avg10: avg10,
+        overall: overall,
+        count: 0,
+        lastAttemptDate: lastAttemptDate,
+        status: userStatus,
+        latestTimestamp: timestamp
+      };
+    }
+    lifetimeRankMap[uId].count += 1;
+    if (timestamp >= (lifetimeRankMap[uId].latestTimestamp || 0)) {
+      lifetimeRankMap[uId].exp = totalExp;
+      lifetimeRankMap[uId].avg10 = avg10;
+      lifetimeRankMap[uId].overall = overall;
+      lifetimeRankMap[uId].lastAttemptDate = lastAttemptDate;
+      lifetimeRankMap[uId].status = userStatus;
+      lifetimeRankMap[uId].latestTimestamp = timestamp;
     }
   };
   
@@ -796,6 +820,7 @@ if (historySheet) {
       
       const lastAttemptDate = String(hDispRow[lastAttemptDateIndex] || '').trim();
       const userStatus = String(hDispRow[statusIndex] || '').trim();
+      addLifetimeRankingEntry(uId, uName, exp, avg10, overall, lastAttemptDate, userStatus, row.timestamp);
       if (isCurrentSeason) {
         addRankingEntry(userFullMap, uId, uName, gainedExp, avg10, overall, lastAttemptDate, userStatus, row.timestamp);
       } else {
@@ -834,12 +859,21 @@ if (historySheet) {
   Object.keys(userFullMap).forEach(uId => {
     userFullMap[uId].quitCount = quitCountMap[uId] || 0;
   });
+  Object.keys(lifetimeRankMap).forEach(uId => {
+    lifetimeRankMap[uId].quitCount = quitCountMap[uId] || 0;
+  });
 
   // ランキングデータに連続正解数を追加（詳細履歴ログから計算）
   // まず全てのユーザーに初期値0を設定
-  Object.keys(userFullMap).forEach(uId => {
-    userFullMap[uId].currentStreak = 0;
-    userFullMap[uId].maxStreak = 0;
+  const allRankingMaps = [userFullMap, lifetimeRankMap];
+  Object.keys(pastSeasonRankMap).forEach(function(seasonKey) {
+    allRankingMaps.push(pastSeasonRankMap[seasonKey]);
+  });
+  allRankingMaps.forEach(function(rankMap) {
+    Object.keys(rankMap).forEach(function(uId) {
+      rankMap[uId].currentStreak = 0;
+      rankMap[uId].maxStreak = 0;
+    });
   });
   
   const detailSheetForRanking = ss.getSheetByName("詳細履歴ログ");
@@ -850,7 +884,8 @@ if (historySheet) {
     // 各ユーザーの詳細履歴をグループ化
     for (let i = 1; i < dDataRanking.length; i++) {
       const uId = String(dDataRanking[i][6]);
-      if (userFullMap[uId]) {
+      const existsInAnyRanking = allRankingMaps.some(function(rankMap) { return !!rankMap[uId]; });
+      if (existsInAnyRanking) {
         if (!userDetailGroups[uId]) {
           userDetailGroups[uId] = [];
         }
@@ -889,8 +924,12 @@ if (historySheet) {
           }
         });
         
-        userFullMap[uId].currentStreak = currentStreak;
-        userFullMap[uId].maxStreak = maxStreak;
+        allRankingMaps.forEach(function(rankMap) {
+          if (rankMap[uId]) {
+            rankMap[uId].currentStreak = currentStreak;
+            rankMap[uId].maxStreak = maxStreak;
+          }
+        });
       }
     });
   }
@@ -908,6 +947,7 @@ if (historySheet) {
     })
     .filter(function(season) { return season.ranking && season.ranking.length > 0; })
     .sort(function(a, b) { return (b.latestTimestamp || 0) - (a.latestTimestamp || 0); });
+  result.lifetimeRanking = Object.values(lifetimeRankMap).sort(function(a, b) { return b.exp - a.exp; });
 }
 
 // 連続正解数の取得（詳細履歴ログから直接計算）
