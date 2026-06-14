@@ -119,6 +119,10 @@ function resolveScienceSeasonId(eraName, fallbackSeasonId, seasonRules) {
   return normalizeActiveSeasonId(fallbackSeasonId);
 }
 
+function resolveStoredHistorySeasonId(rawSeasonId) {
+  return String(rawSeasonId || '').trim();
+}
+
 // 将来の設定シート連携用ヘルパー（現時点では未使用）
 // 形式: シート名「設定」、A列=キー、B列=値
 function readRuntimeConfigFromSheet(ss) {
@@ -843,7 +847,7 @@ if (historySheet) {
     const gainedExpIndex = hasClassColumn ? 9 : 8;
     const gainedExp = parseIntFromCell(hVal[gainedExpIndex], hDispRow[gainedExpIndex]);
     const rawSeasonId = String(hDispRow[20] || '').trim();
-    const seasonId = resolveScienceSeasonId(String(hDispRow[1] || ''), rawSeasonId || activeSeasonId, runtimeConfig.seasonRules);
+    const seasonId = resolveStoredHistorySeasonId(rawSeasonId);
     const isCurrentSeason = seasonId === activeSeasonId;
     
     // 公開設定の位置: 新形式では列15（index 14）、旧形式では列13（index 12）
