@@ -40,10 +40,42 @@ var SCIENCE_EXP_CONFIG = globalThis.SCIENCE_EXP_CONFIG || {
 };
 globalThis.SCIENCE_EXP_CONFIG = SCIENCE_EXP_CONFIG;
 
-var SCIENCE_ACTIVE_SEASON_ID = "2026-after-exam-1";
+var SCIENCE_ACTIVE_SEASON_ID = "R8-2";
+var SCIENCE_LEGACY_ACTIVE_SEASON_ID = "2026-after-exam-1";
 
 function getHistoryHeaders() {
   return ["日時", "単元", "範囲", "正解率", "スコア", "ユーザー名", "ユーザーID", "クラス", "番号", "取得EXP", "累計EXP", "10回平均正解率", "通算正答率", "連続正解数", "公開設定", "セッション数", "最終取り組み日", "ステータス", "有効", "セッションID", "シーズンID"];
+}
+
+function normalizeActiveSeasonId(value) {
+  const seasonId = String(value || '').trim();
+  if (!seasonId || seasonId === SCIENCE_LEGACY_ACTIVE_SEASON_ID) return SCIENCE_ACTIVE_SEASON_ID;
+  return seasonId;
+}
+
+function normalizeEraNameForSeason(value) {
+  let s = String(value || '').trim();
+  try {
+    if (s.normalize) s = s.normalize('NFKC');
+  } catch (e) {
+    // normalize非対応環境でも処理は継続する
+  }
+  return s.replace(/[−－ー―]/g, '-');
+}
+
+function resolveSeasonIdByEra(eraName) {
+  const normalized = normalizeEraNameForSeason(eraName);
+  const match = normalized.match(/^1\s*-\s*(\d+)/);
+  if (!match) return "";
+  const unitNumber = Number(match[1]);
+  if (isNaN(unitNumber)) return "";
+  return unitNumber <= 5 ? "R8-1" : "R8-2";
+}
+
+function resolveScienceSeasonId(eraName, fallbackSeasonId) {
+  const seasonByEra = resolveSeasonIdByEra(eraName);
+  if (seasonByEra) return seasonByEra;
+  return normalizeActiveSeasonId(fallbackSeasonId);
 }
 
 // 将来の設定シート連携用ヘルパー（現時点では未使用）
@@ -223,7 +255,8 @@ const now = new Date();
 const timestampStr = Utilities.formatDate(now, "JST", "yyyy/MM/dd HH:mm:ss");
 const requestedExp = parseInt(p.gainedExp) || 0;
 const sessionId = String(p.sessionId || '').trim();
-const activeSeasonId = String(runtimeConfig.activeSeasonId || SCIENCE_ACTIVE_SEASON_ID).trim() || SCIENCE_ACTIVE_SEASON_ID;
+const activeSeasonId = normalizeActiveSeasonId(runtimeConfig.activeSeasonId);
+const sessionSeasonId = resolveScienceSeasonId(p.summaryEra, activeSeasonId);
 const historyHeaders = getHistoryHeaders();
 const historySheet = getOrCreateSheet(ss, "履歴ログ", historyHeaders);
 if (historySheet.getLastColumn() < historyHeaders.length) {
@@ -392,7 +425,7 @@ const userClass = p.userClass || '';
 const userNumber = p.userNumber || '';
 historySheet.appendRow([
   timestampStr, p.summaryEra, p.summaryRange, p.summaryAccuracy, p.summaryScore,
-  p.dbName, p.userId, userClass, userNumber, gainedExp, newTotalExp, avg10AccStr, overallAccStr, currentStreak, isPublic, sessionCount, lastAttemptDate, userStatus, "1", sessionId, activeSeasonId
+  p.dbName, p.userId, userClass, userNumber, gainedExp, newTotalExp, avg10AccStr, overallAccStr, currentStreak, isPublic, sessionCount, lastAttemptDate, userStatus, "1", sessionId, sessionSeasonId
 ]);
 
 // 成績一覧シートを更新（全分野を1つのシートにまとめる）
@@ -426,7 +459,8 @@ return returnJson({
   requestedExp: requestedExp,
   appliedExp: gainedExp,
   expReason: expReasonParts.join(" / "),
-  activeSeasonId: activeSeasonId
+  activeSeasonId: activeSeasonId,
+  sessionSeasonId: sessionSeasonId
 });
 
 
@@ -527,7 +561,7 @@ try {
 }
 ensureDefaultConfigRows(ss);
 const runtimeConfig = readRuntimeConfigFromSheet(ss);
-const activeSeasonId = String(runtimeConfig.activeSeasonId || SCIENCE_ACTIVE_SEASON_ID).trim() || SCIENCE_ACTIVE_SEASON_ID;
+const activeSeasonId = normalizeActiveSeasonId(runtimeConfig.activeSeasonId);
 const result = { problems: {}, userStats: {}, history: [], seasonHistory: [], ranking: [], pastSeasonRankings: [], lifetimeRanking: [], currentStreak: 0, maxStreak: 0, quitCount: 0, sheetOrder: [], imageMap: [] };
 result.config = {
   appUrl: runtimeConfig.appUrl || "",
@@ -765,7 +799,8 @@ if (historySheet) {
     const overall = hasClassColumn ? String(hDispRow[12] || '') : String(hDispRow[10] || '');
     const gainedExpIndex = hasClassColumn ? 9 : 8;
     const gainedExp = parseIntFromCell(hVal[gainedExpIndex], hDispRow[gainedExpIndex]);
-    const seasonId = String(hDispRow[20] || '').trim();
+    const rawSeasonId = String(hDispRow[20] || '').trim();
+    const seasonId = resolveScienceSeasonId(String(hDispRow[1] || ''), rawSeasonId || activeSeasonId);
     const isCurrentSeason = seasonId === activeSeasonId;
     
     // 公開設定の位置: 新形式では列15（index 14）、旧形式では列13（index 12）
@@ -1095,12 +1130,17 @@ function ensureDefaultConfigRows(ss) {
   }
   const values = sheet.getDataRange().getDisplayValues();
   const existing = {};
-  values.forEach(function(row) {
+  values.forEach(function(row, idx) {
     const key = String(row[0] || '').trim();
-    if (key) existing[key] = true;
+    if (key) existing[key] = { rowIndex: idx + 1, value: String(row[1] || '').trim() };
   });
   if (!existing.activeSeasonId) {
-    sheet.appendRow(["activeSeasonId", SCIENCE_ACTIVE_SEASON_ID, "現在のシーズンID。ホーム画面の今期EXP・今期演習・今期ランキングの集計に使う。", "試験後にリセットしたい場合は新しいIDへ変更する"]);
+    sheet.appendRow(["activeSeasonId", SCIENCE_ACTIVE_SEASON_ID, "現在のシーズンID。ホーム画面の今期EXP・今期演習・今期ランキングの集計に使う。", "R8では 1-0〜1-5=R8-1、1-6以降=R8-2 として自動判定する"]);
+  } else if (existing.activeSeasonId.value === SCIENCE_LEGACY_ACTIVE_SEASON_ID) {
+    sheet.getRange(existing.activeSeasonId.rowIndex, 2).setValue(SCIENCE_ACTIVE_SEASON_ID);
+    if (sheet.getLastColumn() >= 4) {
+      sheet.getRange(existing.activeSeasonId.rowIndex, 4).setValue("R8では 1-0〜1-5=R8-1、1-6以降=R8-2 として自動判定する");
+    }
   }
 }
 
@@ -1158,7 +1198,7 @@ function handleGetAdminStatus(p) {
         dailyGrantLimit: Number(runtimeConfig.dailyGrantLimit) || 3,
         duplicateLogWindowSec: Number(runtimeConfig.duplicateLogWindowSec) || 60,
         hiddenProblemSheets: runtimeConfig.hiddenProblemSheets || [],
-        activeSeasonId: runtimeConfig.activeSeasonId || SCIENCE_ACTIVE_SEASON_ID
+        activeSeasonId: normalizeActiveSeasonId(runtimeConfig.activeSeasonId)
       },
       problemSheets: listProblemSheetStatus(ss, runtimeConfig)
     });
@@ -1224,7 +1264,7 @@ function handleUpdateAdminSettings(p) {
         dailyGrantLimit: Number(runtimeConfig.dailyGrantLimit) || 3,
         duplicateLogWindowSec: Number(runtimeConfig.duplicateLogWindowSec) || 60,
         hiddenProblemSheets: runtimeConfig.hiddenProblemSheets || [],
-        activeSeasonId: runtimeConfig.activeSeasonId || SCIENCE_ACTIVE_SEASON_ID
+        activeSeasonId: normalizeActiveSeasonId(runtimeConfig.activeSeasonId)
       },
       problemSheets: listProblemSheetStatus(ss, runtimeConfig)
     });
