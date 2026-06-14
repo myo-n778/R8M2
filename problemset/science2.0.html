@@ -23,6 +23,47 @@
             --accent-amber: #f59e0b;
             --accent-cyan: #00f2ff;
             --text-main: #f8fafc;
+            --question-font-size: 1.125rem;
+            --question-line-height: 1.45;
+            --option-font-size: 0.95rem;
+            --option-line-height: 1.45;
+            --option-padding-y: 0.85rem;
+            --option-padding-x: 1.2rem;
+            --option-gap: 0.5rem;
+            --explanation-font-size: 0.95rem;
+        }
+
+        body.font-size-small {
+            --question-font-size: 1rem;
+            --question-line-height: 1.42;
+            --option-font-size: 0.88rem;
+            --option-line-height: 1.38;
+            --option-padding-y: 0.72rem;
+            --option-padding-x: 1rem;
+            --option-gap: 0.45rem;
+            --explanation-font-size: 0.88rem;
+        }
+
+        body.font-size-large {
+            --question-font-size: 1.35rem;
+            --question-line-height: 1.48;
+            --option-font-size: 1.08rem;
+            --option-line-height: 1.42;
+            --option-padding-y: 0.72rem;
+            --option-padding-x: 1rem;
+            --option-gap: 0.45rem;
+            --explanation-font-size: 1.08rem;
+        }
+
+        body.font-size-xlarge {
+            --question-font-size: 1.55rem;
+            --question-line-height: 1.5;
+            --option-font-size: 1.18rem;
+            --option-line-height: 1.38;
+            --option-padding-y: 0.62rem;
+            --option-padding-x: 0.9rem;
+            --option-gap: 0.38rem;
+            --explanation-font-size: 1.16rem;
         }
 
         body { font-family: 'Noto Sans JP', sans-serif; background-color: var(--bg-deep); color: var(--text-main); margin: 0; overflow-x: hidden; transition: background-color 0.5s ease; }
@@ -33,20 +74,30 @@
         .option-btn { 
             transition: all 0.2s; 
             background: rgba(255, 255, 255, 0.05); 
-            padding: 0.85rem 1.2rem !important; 
-            min-height: 3.5rem; 
-            line-height: 1.4; 
+            padding: var(--option-padding-y) var(--option-padding-x) !important; 
+            min-height: 3.2rem; 
+            line-height: var(--option-line-height); 
             display: flex; 
-            align-items: center; 
+            align-items: flex-start; 
             justify-content: flex-start;
             text-align: left;
-            font-size: 0.95rem; 
+            font-size: var(--option-font-size); 
             border: 1px solid rgba(255,255,255,0.05); 
             border-radius: 0.75rem; 
             width: 100%; 
             color: var(--text-main);
+            overflow-wrap: anywhere;
+            word-break: break-word;
         }
+        .option-btn > span { width: 100%; overflow-wrap: anywhere; word-break: break-word; }
         .option-btn:not(:disabled):hover { background: rgba(255, 255, 255, 0.1); transform: translateX(6px); border-color: var(--accent-primary); }
+        #question-text { font-size: var(--question-font-size) !important; line-height: var(--question-line-height) !important; overflow-wrap: anywhere; word-break: break-word; }
+        #options-container { gap: var(--option-gap) !important; max-height: clamp(14rem, min(52vh, calc(100vh - 340px)), 34rem); overflow-y: auto; padding-right: 0.15rem; overscroll-behavior: contain; scrollbar-width: thin; }
+        #options-container::-webkit-scrollbar { width: 4px; }
+        #options-container::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.18); border-radius: 999px; }
+        #explanation-content { font-size: var(--explanation-font-size) !important; overflow-wrap: anywhere; word-break: break-word; }
+        .font-size-control button { color: rgba(248, 250, 252, 0.68); background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.12); }
+        .font-size-control button.active { color: var(--bg-deep); background: var(--accent-primary); border-color: rgba(255, 255, 255, 0.55); }
         
         .explanation-card { line-height: 1.6; border-left: 4px solid var(--accent-primary); }
         .question-image-block {
@@ -180,6 +231,19 @@
         /* KaTeX数式のスタイル調整 */
         .katex { font-size: 1.1em; }
         .katex-display { margin: 1em 0; }
+        @media (min-width: 768px) {
+            :root { --question-font-size: 1.5rem; }
+            body.font-size-small { --question-font-size: 1.25rem; }
+            body.font-size-large { --question-font-size: 1.8rem; }
+            body.font-size-xlarge { --question-font-size: 2rem; }
+        }
+        @media (max-width: 640px) {
+            #options-container { max-height: clamp(12rem, min(48vh, calc(100vh - 300px)), 28rem); }
+            body.font-size-xlarge {
+                --question-font-size: 1.42rem;
+                --option-font-size: 1.08rem;
+            }
+        }
     </style>
 </head>
 <body class="min-h-screen flex flex-col">
@@ -256,6 +320,15 @@
                             <button onclick="setGoal(60)" id="goal-60" class="goal-btn px-1.5 py-0.5 rounded-md text-[8px] font-bold">60%</button>
                             <button onclick="setGoal(80)" id="goal-80" class="goal-btn px-1.5 py-0.5 rounded-md text-[8px] font-bold active">80%</button>
                             <button onclick="setGoal(100)" id="goal-100" class="goal-btn px-1.5 py-0.5 rounded-md text-[8px] font-bold">100%</button>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-1.5 ml-0 md:ml-2 pl-2 border-l border-white/10 flex-shrink-0">
+                        <label class="text-[8px] font-black text-cyan-300 uppercase italic flex items-center gap-1 whitespace-nowrap"><i class="fas fa-text-height"></i> Text</label>
+                        <div id="font-size-control" class="font-size-control flex gap-0.5">
+                            <button type="button" data-font-size="small" class="px-1.5 py-0.5 rounded-md text-[8px] font-black transition-all">小</button>
+                            <button type="button" data-font-size="standard" class="px-1.5 py-0.5 rounded-md text-[8px] font-black transition-all">標準</button>
+                            <button type="button" data-font-size="large" class="px-1.5 py-0.5 rounded-md text-[8px] font-black transition-all">大</button>
+                            <button type="button" data-font-size="xlarge" class="px-1.5 py-0.5 rounded-md text-[8px] font-black transition-all">特大</button>
                         </div>
                     </div>
                 </div>
@@ -510,6 +583,8 @@
             });
             return stats;
         });
+        const FONT_SIZE_STORAGE_KEY = 'ethics_font_size_mode';
+        const FONT_SIZE_MODES = ['small', 'standard', 'large', 'xlarge'];
 
         let USER_NAME = "";
         let USER_CLASS = ""; // ユーザーのクラス（菊/桜）
@@ -1018,6 +1093,25 @@
                 return `<figure class="question-image-block"><img src="${src}" alt="${alt}" loading="lazy"></figure>`;
             });
         }
+
+        function normalizeFontSizeMode(mode) {
+            return FONT_SIZE_MODES.includes(mode) ? mode : 'standard';
+        }
+
+        window.applyFontSizeMode = (mode) => {
+            const normalized = normalizeFontSizeMode(mode);
+            if (!document.body) return;
+            FONT_SIZE_MODES.forEach((name) => document.body.classList.remove(`font-size-${name}`));
+            if (normalized !== 'standard') document.body.classList.add(`font-size-${normalized}`);
+            document.querySelectorAll('[data-font-size]').forEach((btn) => {
+                btn.classList.toggle('active', btn.dataset.fontSize === normalized);
+            });
+            localStorage.setItem(FONT_SIZE_STORAGE_KEY, normalized);
+        };
+
+        window.setFontSizeMode = (mode) => {
+            window.applyFontSizeMode(mode);
+        };
 
         window.applyTheme = (modeId) => {
             const t = THEMES[modeId]; if (!t) return;
@@ -2942,6 +3036,7 @@
         window.onload = () => {
             initUserInfo();
             updateRuntimeConfigUI(null);
+            window.applyFontSizeMode(localStorage.getItem(FONT_SIZE_STORAGE_KEY) || 'standard');
             
             // 復習システムの情報をローカルストレージから読み込む
             try {
@@ -3018,6 +3113,9 @@
             setOnClick('admin-settings-save-btn', saveAdminSettings);
             setOnClick('merge-dry-run-btn', runMergeDryRun);
             setOnClick('merge-apply-btn', applyCheckedMerge);
+            document.querySelectorAll('[data-font-size]').forEach((btn) => {
+                btn.addEventListener('click', () => window.setFontSizeMode(btn.dataset.fontSize));
+            });
             ['merge-from-user-id', 'merge-to-user-id'].forEach((id) => {
                 const el = getEl(id);
                 if (el) {
