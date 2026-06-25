@@ -364,8 +364,6 @@ const todayKey = Utilities.formatDate(now, "JST", "yyyy/MM/dd");
 const currentSetKey = buildSetKey(p.summaryEra, p.summaryRange);
 const dailyGrantLimit = Number(runtimeConfig.dailyGrantLimit) || 3;
 const disableExpCaps = !!runtimeConfig.disableExpCaps;
-const currentAttemptAccuracy = Math.round(parseAccuracyToPercent(p.summaryAccuracy) || 0);
-const isCurrentAttemptPerfect = currentAttemptAccuracy === 100;
 
 let firstPerfectTimestampForCurrentSet = null;
 for (let i = 0; i < userRows.length; i++) {
@@ -390,9 +388,8 @@ if (firstPerfectTimestampForCurrentSet !== null) {
     const rowGainedExp = parseInt(row[gainedExpIndex]) || 0;
     const rowDateKey = toDateKeyJST(row[0]);
     const rowSetKey = buildSetKey(row[1], row[2]);
-    const rowAccuracy = Math.round(parseAccuracyToPercent(row[3]) || 0);
     const rowTimestamp = new Date(row[0]).getTime();
-    if (rowDateKey === todayKey && rowSetKey === currentSetKey && rowAccuracy === 100 && rowGainedExp > 0 && !isNaN(rowTimestamp) && rowTimestamp > firstPerfectTimestampForCurrentSet) {
+    if (rowDateKey === todayKey && rowSetKey === currentSetKey && rowGainedExp > 0 && !isNaN(rowTimestamp) && rowTimestamp > firstPerfectTimestampForCurrentSet) {
       expGrantedAfterPerfectForCurrentSetToday++;
     }
   }
@@ -400,7 +397,7 @@ if (firstPerfectTimestampForCurrentSet !== null) {
 
 let gainedExp = requestedExp;
 const expReasonParts = [];
-if (!disableExpCaps && firstPerfectTimestampForCurrentSet !== null && isCurrentAttemptPerfect && gainedExp > 0 && expGrantedAfterPerfectForCurrentSetToday >= dailyGrantLimit) {
+if (!disableExpCaps && firstPerfectTimestampForCurrentSet !== null && gainedExp > 0 && expGrantedAfterPerfectForCurrentSetToday >= dailyGrantLimit) {
   gainedExp = 0;
   expReasonParts.push(`満点到達済みセットのEXP加算は1日${dailyGrantLimit}回まで`);
 }
