@@ -1585,6 +1585,7 @@ function ensureSheetWithHeaders(ss, sheetName, headers) {
   if (sheet.getLastRow() === 0) {
     sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
     sheet.getRange(1, 1, 1, headers.length).setBackground("#f3f3f3").setFontWeight("bold");
+    if (sheetName === "記述履歴ログ") sheet.getRange("A:A").setNumberFormat("yyyy/MM/dd HH:mm");
     sheet.setFrozenRows(1);
     return sheet;
   }
