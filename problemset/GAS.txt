@@ -20,6 +20,8 @@ if (action === 'updateAnnouncement') return handleUpdateAnnouncement(e.parameter
 if (action === 'updateAdminSettings') return handleUpdateAdminSettings(e.parameter);
 if (action === 'mergeUserDryRun') return handleMergeUser(e.parameter, false);
 if (action === 'mergeUserApply') return handleMergeUser(e.parameter, true);
+if (action === 'syncWriting') return handleSyncWriting(e.parameter);
+if (action === 'gradeWriting') return handleGradeWriting(e.parameter);
 // syncアクションの場合
 const ssId = e.parameter.id;
 const userId = e.parameter.userId || '';
@@ -138,7 +140,12 @@ function readRuntimeConfigFromSheet(ss) {
     adminKey: "",
     hiddenProblemSheets: [],
     activeSeasonId: SCIENCE_ACTIVE_SEASON_ID,
-    seasonRules: SCIENCE_DEFAULT_SEASON_RULES
+    seasonRules: SCIENCE_DEFAULT_SEASON_RULES,
+    writingAiEnabled: false,
+    writingDailyLimitPerUser: 5,
+    writingMonthlyLimitTotal: 3000,
+    writingMaxChars: 300,
+    writingModel: "gpt-5.4-nano"
   };
   try {
     const configSheet = ss.getSheetByName("設定");
@@ -183,7 +190,12 @@ function readRuntimeConfigFromSheet(ss) {
       adminKey: parseText(map.adminKey, defaults.adminKey),
       hiddenProblemSheets: parseList(map.hiddenProblemSheets, defaults.hiddenProblemSheets),
       activeSeasonId: parseText(map.activeSeasonId, defaults.activeSeasonId),
-      seasonRules: parseSeasonRules(map.seasonRules)
+      seasonRules: parseSeasonRules(map.seasonRules),
+      writingAiEnabled: parseBool(map.writingAiEnabled, defaults.writingAiEnabled),
+      writingDailyLimitPerUser: parseNum(map.writingDailyLimitPerUser, defaults.writingDailyLimitPerUser),
+      writingMonthlyLimitTotal: parseNum(map.writingMonthlyLimitTotal, defaults.writingMonthlyLimitTotal),
+      writingMaxChars: parseNum(map.writingMaxChars, defaults.writingMaxChars),
+      writingModel: parseText(map.writingModel, defaults.writingModel)
     };
   } catch (e) {
     // 設定シート不備では処理を止めず、既定値で継続する
@@ -633,7 +645,7 @@ result.lifetimeSummary = {
 result.imageMap = readImageMapFromSheet(ss);
 
 // システム用シートを除外するリスト
-const excludeSheets = ["履歴ログ", "詳細履歴ログ", "問題別統計DB", "成績一覧", "メンバー一覧", "設定", "画像管理", "中断ログ", "管理操作", "管理ログ"];
+const excludeSheets = ["履歴ログ", "詳細履歴ログ", "問題別統計DB", "成績一覧", "メンバー一覧", "設定", "画像管理", "中断ログ", "管理操作", "管理ログ", "記述問題", "記述履歴ログ"];
 const excludeSheetAliases = ["config", "settings", "_config", "_settings"];
 const normalizeSheetName = (name) => String(name || '').replace(/\u3000/g, ' ').trim();
 const hiddenProblemSheetSet = {};
@@ -1193,6 +1205,21 @@ function ensureDefaultConfigRows(ss) {
   if (!existing.seasonRules) {
     sheet.appendRow(["seasonRules", SCIENCE_DEFAULT_SEASON_RULES_TEXT, "単元名からシーズンIDを自動判定する対応表。形式: 開始..終了=シーズンID。終了を空にすると以降すべて。", "例: 1-0..1-5=R8-1 / 1-6..=R8-2"]);
   }
+  if (!existing.writingAiEnabled) {
+    sheet.appendRow(["writingAiEnabled", "false", "記述問題AIフィードバックを有効にするか。trueでAPI呼び出しを許可する。", "APIキーはApps ScriptのScript PropertiesにOPENAI_API_KEYとして保存する"]);
+  }
+  if (!existing.writingDailyLimitPerUser) {
+    sheet.appendRow(["writingDailyLimitPerUser", "5", "記述フィードバックの1ユーザー1日あたり上限回数。0以下で無制限。", "API費用抑制用"]);
+  }
+  if (!existing.writingMonthlyLimitTotal) {
+    sheet.appendRow(["writingMonthlyLimitTotal", "3000", "記述フィードバックの全体月間上限回数。0以下で無制限。", "API費用抑制用"]);
+  }
+  if (!existing.writingMaxChars) {
+    sheet.appendRow(["writingMaxChars", "300", "生徒回答の最大文字数。下限は設けない。", "問題ごとの上限が空の場合に使う"]);
+  }
+  if (!existing.writingModel) {
+    sheet.appendRow(["writingModel", "gpt-5.4-nano", "記述フィードバックに使うOpenAIモデル。", "初期設定は安さ優先"]);
+  }
 }
 
 function parseUserIdParts(userId) {
@@ -1205,7 +1232,7 @@ function parseUserIdParts(userId) {
 }
 
 function listProblemSheetStatus(ss, runtimeConfig) {
-  const systemSheets = ["履歴ログ", "詳細履歴ログ", "問題別統計DB", "成績一覧", "メンバー一覧", "設定", "画像管理", "中断ログ", "管理操作", "管理ログ"];
+  const systemSheets = ["履歴ログ", "詳細履歴ログ", "問題別統計DB", "成績一覧", "メンバー一覧", "設定", "画像管理", "中断ログ", "管理操作", "管理ログ", "記述問題", "記述履歴ログ"];
   const systemAliases = ["config", "settings", "_config", "_settings"];
   const normalize = function(name) { return String(name || '').replace(/\u3000/g, ' ').trim(); };
   const hiddenSet = {};
@@ -1542,6 +1569,325 @@ function recalculateUserHistoryDerivedColumns(ss, userId) {
     sheet.getRange(item.rowNumber, 16).setValue(idx + 1);
     sheet.getRange(item.rowNumber, 17).setValue(row[0]);
   });
+}
+
+function getWritingProblemHeaders() {
+  return ["problemId", "単元", "学年", "問題文", "模範要素", "評価観点", "よくある誤答", "複数説・補足", "上限文字数", "有効", "表示順"];
+}
+
+function getWritingLogHeaders() {
+  return ["日時", "ユーザーID", "ユーザー名", "クラス", "番号", "problemId", "単元", "学年", "回答", "評価", "AIコメント", "良い点", "直すと良い点", "次に意識すること", "事実確認", "事実誤認", "複数説補足", "model", "status", "requestTokens", "responseTokens"];
+}
+
+function ensureSheetWithHeaders(ss, sheetName, headers) {
+  let sheet = ss.getSheetByName(sheetName);
+  if (!sheet) sheet = ss.insertSheet(sheetName);
+  if (sheet.getLastRow() === 0) {
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+    sheet.getRange(1, 1, 1, headers.length).setBackground("#f3f3f3").setFontWeight("bold");
+    sheet.setFrozenRows(1);
+    return sheet;
+  }
+  const current = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), headers.length)).getDisplayValues()[0];
+  const existing = {};
+  current.forEach(function(h) {
+    const key = String(h || '').trim();
+    if (key) existing[key] = true;
+  });
+  headers.forEach(function(header) {
+    if (existing[header]) return;
+    const nextCol = sheet.getLastColumn() + 1;
+    sheet.getRange(1, nextCol).setValue(header).setBackground("#f3f3f3").setFontWeight("bold");
+  });
+  return sheet;
+}
+
+function getHeaderIndexMap(headers) {
+  const map = {};
+  headers.forEach(function(h, idx) {
+    const key = String(h || '').trim();
+    if (key) map[key] = idx;
+  });
+  return map;
+}
+
+function getFirstColumnValue(row, headerMap, names, fallback) {
+  for (let i = 0; i < names.length; i++) {
+    const idx = headerMap[names[i]];
+    if (idx === 0 || idx > 0) {
+      const value = row[idx];
+      if (value !== undefined && value !== null && String(value).trim() !== '') return String(value).trim();
+    }
+  }
+  return fallback || "";
+}
+
+function parseWritingEnabled(value) {
+  const s = String(value || '').trim().toLowerCase();
+  if (!s) return false;
+  return ["true", "1", "on", "yes", "y", "有効", "表示"].indexOf(s) >= 0;
+}
+
+function normalizeWritingEvaluation(value) {
+  const s = String(value || '').trim().toUpperCase();
+  return ["S", "A", "B", "C"].indexOf(s) >= 0 ? s : "C";
+}
+
+function getWritingSheets(ss) {
+  return {
+    problemSheet: ensureSheetWithHeaders(ss, "記述問題", getWritingProblemHeaders()),
+    logSheet: ensureSheetWithHeaders(ss, "記述履歴ログ", getWritingLogHeaders())
+  };
+}
+
+function readWritingProblems(ss, runtimeConfig) {
+  const sheet = getWritingSheets(ss).problemSheet;
+  const values = sheet.getDataRange().getDisplayValues();
+  if (!values || values.length <= 1) return [];
+  const map = getHeaderIndexMap(values[0].map(function(h) { return String(h || '').trim(); }));
+  const defaultMaxChars = Math.max(1, Number(runtimeConfig.writingMaxChars) || 300);
+  const problems = [];
+  values.slice(1).forEach(function(row, idx) {
+    const problemId = getFirstColumnValue(row, map, ["problemId", "問題ID", "id"], "");
+    const prompt = getFirstColumnValue(row, map, ["問題文", "prompt"], "");
+    if (!problemId || !prompt) return;
+    if (!parseWritingEnabled(getFirstColumnValue(row, map, ["有効", "enabled"], ""))) return;
+    const maxChars = Math.max(1, Number(getFirstColumnValue(row, map, ["上限文字数", "maxChars"], "")) || defaultMaxChars);
+    problems.push({
+      problemId: problemId,
+      unit: getFirstColumnValue(row, map, ["単元", "unit"], ""),
+      grade: getFirstColumnValue(row, map, ["学年", "grade"], ""),
+      prompt: prompt,
+      expectedAnswer: getFirstColumnValue(row, map, ["模範要素", "expectedAnswer"], ""),
+      rubric: getFirstColumnValue(row, map, ["評価観点", "rubric"], ""),
+      commonMisconceptions: getFirstColumnValue(row, map, ["よくある誤答", "commonMisconceptions"], ""),
+      acceptedVariations: getFirstColumnValue(row, map, ["複数説・補足", "acceptedVariations"], ""),
+      maxChars: maxChars,
+      order: Number(getFirstColumnValue(row, map, ["表示順", "order"], "")) || idx + 1
+    });
+  });
+  problems.sort(function(a, b) {
+    return (Number(a.order) || 0) - (Number(b.order) || 0) || String(a.problemId).localeCompare(String(b.problemId));
+  });
+  return problems;
+}
+
+function getWritingUsageCounts(logSheet, userId) {
+  const values = logSheet.getDataRange().getValues();
+  const now = new Date();
+  const todayKey = Utilities.formatDate(now, "Asia/Tokyo", "yyyy-MM-dd");
+  const monthKey = Utilities.formatDate(now, "Asia/Tokyo", "yyyy-MM");
+  let daily = 0;
+  let monthly = 0;
+  if (!values || values.length <= 1) return { daily: 0, monthly: 0 };
+  for (let i = 1; i < values.length; i++) {
+    const row = values[i];
+    const status = String(row[18] || '').trim();
+    if (["ok", "api_error"].indexOf(status) < 0) continue;
+    const date = row[0] instanceof Date ? row[0] : new Date(row[0]);
+    if (isNaN(date.getTime())) continue;
+    const rowDay = Utilities.formatDate(date, "Asia/Tokyo", "yyyy-MM-dd");
+    const rowMonth = Utilities.formatDate(date, "Asia/Tokyo", "yyyy-MM");
+    if (rowMonth === monthKey) monthly++;
+    if (String(row[1] || '') === String(userId || '') && rowDay === todayKey) daily++;
+  }
+  return { daily: daily, monthly: monthly };
+}
+
+function appendWritingLog(logSheet, entry) {
+  const row = getWritingLogHeaders().map(function(header) {
+    return entry[header] !== undefined && entry[header] !== null ? entry[header] : "";
+  });
+  logSheet.appendRow(row);
+}
+
+function findWritingProblemById(problems, problemId) {
+  const target = String(problemId || '').trim();
+  for (let i = 0; i < problems.length; i++) {
+    if (String(problems[i].problemId || '').trim() === target) return problems[i];
+  }
+  return null;
+}
+
+function buildWritingPrompt(problem, answer) {
+  return [
+    "あなたは中学生向け理科の学習支援者です。これは正式成績ではなく練習用フィードバックです。",
+    "評価はS/A/B/Cのみ。学年相応の理解、科学的思考、根拠の明確さを重視してください。",
+    "事実誤認はやわらかくても明確に指摘してください。複数の見方や条件差がある場合は補足してください。",
+    "コメントは短く、JSONのみで返してください。",
+    "",
+    "出力JSON形式:",
+    '{"evaluation":"S|A|B|C","overall":"80字以内","good":"80字以内","improve":"80字以内","next":"80字以内","factCheck":"80字以内","misconception":"80字以内または空","variationNote":"80字以内または空"}',
+    "",
+    "学年: " + (problem.grade || "未指定"),
+    "単元: " + (problem.unit || "未指定"),
+    "問題: " + problem.prompt,
+    "模範要素: " + (problem.expectedAnswer || "未設定"),
+    "評価観点: " + (problem.rubric || "未設定"),
+    "よくある誤答: " + (problem.commonMisconceptions || "未設定"),
+    "複数説・補足: " + (problem.acceptedVariations || "未設定"),
+    "生徒回答: " + answer
+  ].join("\n");
+}
+
+function parseOpenAiText(data) {
+  if (!data) return "";
+  if (data.output_text) return String(data.output_text);
+  const chunks = [];
+  (data.output || []).forEach(function(item) {
+    (item.content || []).forEach(function(part) {
+      if (part.text) chunks.push(part.text);
+      if (part.type === "output_text" && part.text) chunks.push(part.text);
+    });
+  });
+  return chunks.join("\n").trim();
+}
+
+function callOpenAiWritingFeedback(model, prompt) {
+  const apiKey = PropertiesService.getScriptProperties().getProperty("OPENAI_API_KEY");
+  if (!apiKey) return { ok: false, status: "no_api_key", error: "OPENAI_API_KEYが未設定です" };
+  const response = UrlFetchApp.fetch("https://api.openai.com/v1/responses", {
+    method: "post",
+    contentType: "application/json",
+    headers: { Authorization: "Bearer " + apiKey },
+    muteHttpExceptions: true,
+    payload: JSON.stringify({ model: model, input: prompt, max_output_tokens: 500 })
+  });
+  const code = response.getResponseCode();
+  const body = response.getContentText();
+  let data = {};
+  try {
+    data = JSON.parse(body);
+  } catch (e) {
+    data = { raw: body };
+  }
+  if (code < 200 || code >= 300) {
+    return { ok: false, status: "api_error", error: (data.error && data.error.message) || body || ("HTTP " + code) };
+  }
+  const text = parseOpenAiText(data);
+  let parsed = {};
+  try {
+    parsed = JSON.parse(String(text || '').replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```$/i, '').trim());
+  } catch (e) {
+    parsed = { evaluation: "C", overall: "フィードバックの形式を整えられませんでした。先生に確認してください。", good: "", improve: "", next: "", factCheck: "", misconception: "", variationNote: "" };
+  }
+  const usage = data.usage || {};
+  return {
+    ok: true,
+    status: "ok",
+    result: {
+      evaluation: normalizeWritingEvaluation(parsed.evaluation),
+      overall: String(parsed.overall || '').trim(),
+      good: String(parsed.good || '').trim(),
+      improve: String(parsed.improve || '').trim(),
+      next: String(parsed.next || '').trim(),
+      factCheck: String(parsed.factCheck || '').trim(),
+      misconception: String(parsed.misconception || '').trim(),
+      variationNote: String(parsed.variationNote || '').trim()
+    },
+    requestTokens: usage.input_tokens || "",
+    responseTokens: usage.output_tokens || ""
+  };
+}
+
+function handleSyncWriting(p) {
+  try {
+    const spreadsheetId = p.spreadsheetId || p.id || '';
+    if (!spreadsheetId || spreadsheetId.trim() === '') return returnJson({ error: "スプレッドシートIDが指定されていません" });
+    const ss = SpreadsheetApp.openById(spreadsheetId);
+    ensureDefaultConfigRows(ss);
+    const runtimeConfig = readRuntimeConfigFromSheet(ss);
+    const sheets = getWritingSheets(ss);
+    const userId = String(p.userId || '').trim();
+    const usage = getWritingUsageCounts(sheets.logSheet, userId);
+    const dailyLimit = Number(runtimeConfig.writingDailyLimitPerUser) || 0;
+    const monthlyLimit = Number(runtimeConfig.writingMonthlyLimitTotal) || 0;
+    const problems = readWritingProblems(ss, runtimeConfig).map(function(problem) {
+      return { problemId: problem.problemId, unit: problem.unit, grade: problem.grade, prompt: problem.prompt, maxChars: problem.maxChars, order: problem.order };
+    });
+    return returnJson({
+      success: true,
+      problems: problems,
+      config: {
+        writingAiEnabled: !!runtimeConfig.writingAiEnabled,
+        writingDailyLimitPerUser: dailyLimit,
+        writingMonthlyLimitTotal: monthlyLimit,
+        writingMaxChars: Number(runtimeConfig.writingMaxChars) || 300,
+        writingModel: runtimeConfig.writingModel || "gpt-5.4-nano"
+      },
+      usage: {
+        dailyUsed: usage.daily,
+        monthlyUsed: usage.monthly,
+        dailyRemaining: dailyLimit > 0 ? Math.max(0, dailyLimit - usage.daily) : null,
+        monthlyRemaining: monthlyLimit > 0 ? Math.max(0, monthlyLimit - usage.monthly) : null
+      }
+    });
+  } catch (err) {
+    return returnJson({ error: "記述問題の同期に失敗しました: " + err.toString() });
+  }
+}
+
+function handleGradeWriting(p) {
+  const lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(10000);
+    const spreadsheetId = p.spreadsheetId || p.id || '';
+    if (!spreadsheetId || spreadsheetId.trim() === '') return returnJson({ error: "スプレッドシートIDが指定されていません" });
+    const ss = SpreadsheetApp.openById(spreadsheetId);
+    ensureDefaultConfigRows(ss);
+    const runtimeConfig = readRuntimeConfigFromSheet(ss);
+    const sheets = getWritingSheets(ss);
+    if (!runtimeConfig.writingAiEnabled) return returnJson({ error: "記述AIフィードバックは現在OFFです。" });
+
+    const userId = String(p.userId || '').trim();
+    const userName = String(p.userName || '').trim();
+    const userClass = String(p.userClass || '').trim();
+    const userNumber = String(p.userNumber || '').trim();
+    const problemId = String(p.problemId || '').trim();
+    const answer = String(p.answer || '').trim();
+    if (!userId || !userName) return returnJson({ error: "ユーザー情報が不足しています。" });
+    if (!problemId) return returnJson({ error: "問題IDが指定されていません。" });
+    if (!answer) return returnJson({ error: "回答が空欄です。" });
+
+    const problem = findWritingProblemById(readWritingProblems(ss, runtimeConfig), problemId);
+    if (!problem) return returnJson({ error: "指定された記述問題が見つかりません。" });
+    const maxChars = Math.max(1, Number(problem.maxChars) || Number(runtimeConfig.writingMaxChars) || 300);
+    if (answer.length > maxChars) return returnJson({ error: "回答が上限文字数を超えています。", maxChars: maxChars });
+
+    const usage = getWritingUsageCounts(sheets.logSheet, userId);
+    const dailyLimit = Number(runtimeConfig.writingDailyLimitPerUser) || 0;
+    const monthlyLimit = Number(runtimeConfig.writingMonthlyLimitTotal) || 0;
+    if (dailyLimit > 0 && usage.daily >= dailyLimit) return returnJson({ error: "本日のフィードバック上限に達しています。", usage: usage });
+    if (monthlyLimit > 0 && usage.monthly >= monthlyLimit) return returnJson({ error: "今月の全体フィードバック上限に達しています。", usage: usage });
+
+    const model = runtimeConfig.writingModel || "gpt-5.4-nano";
+    const feedback = callOpenAiWritingFeedback(model, buildWritingPrompt(problem, answer));
+    if (!feedback.ok) {
+      appendWritingLog(sheets.logSheet, {
+        "日時": new Date(), "ユーザーID": userId, "ユーザー名": userName, "クラス": userClass, "番号": userNumber,
+        "problemId": problemId, "単元": problem.unit, "学年": problem.grade, "回答": answer, "評価": "",
+        "AIコメント": feedback.error || "", "model": model, "status": feedback.status || "api_error"
+      });
+      return returnJson({ error: "フィードバックを作成できませんでした: " + (feedback.error || "API error"), status: feedback.status || "api_error" });
+    }
+    const result = feedback.result;
+    appendWritingLog(sheets.logSheet, {
+      "日時": new Date(), "ユーザーID": userId, "ユーザー名": userName, "クラス": userClass, "番号": userNumber,
+      "problemId": problemId, "単元": problem.unit, "学年": problem.grade, "回答": answer, "評価": result.evaluation,
+      "AIコメント": result.overall, "良い点": result.good, "直すと良い点": result.improve, "次に意識すること": result.next,
+      "事実確認": result.factCheck, "事実誤認": result.misconception, "複数説補足": result.variationNote,
+      "model": model, "status": "ok", "requestTokens": feedback.requestTokens, "responseTokens": feedback.responseTokens
+    });
+    return returnJson({ success: true, feedback: result, model: model });
+  } catch (err) {
+    return returnJson({ error: "記述フィードバック処理に失敗しました: " + err.toString() });
+  } finally {
+    try {
+      lock.releaseLock();
+    } catch (releaseError) {
+      console.error("記述フィードバックロック解放エラー:", releaseError);
+    }
+  }
 }
 
 function handleDetectDuplicates(p) {

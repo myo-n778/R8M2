@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SCIENCE 2026 Writing Feedback</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #08111f;
+      --panel: rgba(20, 35, 57, 0.78);
+      --line: rgba(148, 163, 184, 0.18);
+      --cyan: #22d3ee;
+      --lime: #a3e635;
+      --amber: #fbbf24;
+      --rose: #fb7185;
+    }
+    body {
+      min-height: 100vh;
+      background:
+        radial-gradient(circle at 12% 18%, rgba(34, 211, 238, 0.18), transparent 32rem),
+        radial-gradient(circle at 82% 6%, rgba(163, 230, 53, 0.13), transparent 26rem),
+        linear-gradient(135deg, #08111f 0%, #111827 54%, #0f172a 100%);
+      color: #e5f4ff;
+      font-family: "Avenir Next", "Hiragino Sans", "Yu Gothic", sans-serif;
+    }
+    .glass {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      box-shadow: 0 24px 80px rgba(0, 0, 0, 0.28);
+      backdrop-filter: blur(18px);
+    }
+    .chip {
+      border: 1px solid rgba(34, 211, 238, 0.25);
+      background: rgba(34, 211, 238, 0.08);
+      color: #a5f3fc;
+    }
+    .problem-card {
+      border: 1px solid rgba(148, 163, 184, 0.18);
+      background: rgba(15, 23, 42, 0.66);
+      transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+    }
+    .problem-card:hover, .problem-card.active {
+      transform: translateY(-2px);
+      border-color: rgba(34, 211, 238, 0.7);
+      background: rgba(8, 47, 73, 0.58);
+    }
+    textarea {
+      resize: vertical;
+      min-height: 11rem;
+    }
+    .eval-badge {
+      width: 4.5rem;
+      height: 4.5rem;
+      border-radius: 1.5rem;
+      display: grid;
+      place-items: center;
+      background: linear-gradient(135deg, rgba(34, 211, 238, 0.22), rgba(163, 230, 53, 0.18));
+      border: 1px solid rgba(34, 211, 238, 0.38);
+      color: white;
+      font-size: 2.4rem;
+      font-weight: 900;
+    }
+  </style>
+</head>
+<body>
+  <main class="max-w-6xl mx-auto px-4 py-6 md:py-10">
+    <header class="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-6">
+      <div>
+        <div class="text-[10px] tracking-[0.36em] text-cyan-200/80 font-black uppercase">SCIENCE 2026</div>
+        <h1 class="text-3xl md:text-5xl font-black tracking-tight mt-2">Writing Feedback</h1>
+        <p class="text-slate-300 text-sm mt-3">記述問題の練習用フィードバックです。EXPやランキングには入りません。</p>
+      </div>
+      <div class="flex gap-2">
+        <a href="./science2.0.html" class="chip rounded-full px-4 py-2 text-xs font-black uppercase"><i class="fa-solid fa-arrow-left"></i> Selection</a>
+        <button id="sync-btn" class="chip rounded-full px-4 py-2 text-xs font-black uppercase"><i class="fa-solid fa-rotate"></i> Sync</button>
+      </div>
+    </header>
+
+    <section id="profile-panel" class="glass rounded-[2rem] p-5 mb-6">
+      <div class="grid md:grid-cols-[1fr_auto] gap-4 items-end">
+        <div>
+          <div class="text-xs text-slate-400 font-bold mb-2">USER</div>
+          <div class="grid grid-cols-3 gap-2">
+            <input id="user-class" class="bg-slate-950/70 border border-slate-700 rounded-xl px-3 py-3 text-sm outline-none focus:border-cyan-400" placeholder="クラス">
+            <input id="user-number" class="bg-slate-950/70 border border-slate-700 rounded-xl px-3 py-3 text-sm outline-none focus:border-cyan-400" placeholder="番号">
+            <input id="user-name" class="bg-slate-950/70 border border-slate-700 rounded-xl px-3 py-3 text-sm outline-none focus:border-cyan-400" placeholder="名前">
+          </div>
+        </div>
+        <button id="save-profile-btn" class="bg-cyan-500 hover:bg-cyan-400 text-slate-950 rounded-xl px-5 py-3 text-xs font-black uppercase">Save Profile</button>
+      </div>
+    </section>
+
+    <section class="grid lg:grid-cols-[0.9fr_1.1fr] gap-6">
+      <aside class="glass rounded-[2rem] p-5">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-sm font-black uppercase tracking-[0.18em] text-cyan-200">Writing Tasks</h2>
+          <span id="task-count" class="text-[10px] text-slate-400 font-bold">0 tasks</span>
+        </div>
+        <div id="limit-status" class="rounded-2xl bg-slate-950/50 border border-slate-800 p-3 text-xs text-slate-300 mb-4">同期してください。</div>
+        <div id="problem-list" class="space-y-3"></div>
+      </aside>
+
+      <section class="glass rounded-[2rem] p-5 md:p-6 min-h-[36rem]">
+        <div id="empty-state" class="h-full min-h-[28rem] grid place-items-center text-center text-slate-400">
+          <div>
+            <i class="fa-solid fa-pen-nib text-4xl text-cyan-300 mb-4"></i>
+            <p class="font-bold">左から記述問題を選んでください。</p>
+            <p class="text-xs mt-2">問題が出ない場合は、スプレッドシートの `記述問題` シートを確認してください。</p>
+          </div>
+        </div>
+
+        <div id="writing-area" class="hidden space-y-5">
+          <div>
+            <div class="flex flex-wrap gap-2 mb-3">
+              <span id="selected-unit" class="chip rounded-full px-3 py-1 text-[10px] font-black"></span>
+              <span id="selected-grade" class="chip rounded-full px-3 py-1 text-[10px] font-black"></span>
+              <span id="max-chars" class="chip rounded-full px-3 py-1 text-[10px] font-black"></span>
+            </div>
+            <h2 id="prompt" class="text-xl md:text-2xl font-black leading-relaxed"></h2>
+          </div>
+
+          <div>
+            <div class="flex justify-between items-center mb-2">
+              <label for="answer" class="text-xs font-black uppercase text-slate-300">Your Answer</label>
+              <span id="char-count" class="text-xs text-slate-400">0 / 300</span>
+            </div>
+            <textarea id="answer" class="w-full bg-slate-950/70 border border-slate-700 rounded-2xl p-4 text-base leading-relaxed outline-none focus:border-cyan-400" placeholder="ここに自分の考えを書きます。短くても送れます。"></textarea>
+          </div>
+
+          <div class="flex flex-col sm:flex-row gap-3">
+            <button id="feedback-btn" class="bg-lime-400 hover:bg-lime-300 text-slate-950 rounded-2xl px-5 py-4 text-sm font-black uppercase flex-1">
+              <i class="fa-solid fa-comments"></i> フィードバックを見る
+            </button>
+            <button id="clear-btn" class="bg-white/10 hover:bg-white/15 border border-white/10 text-slate-200 rounded-2xl px-5 py-4 text-sm font-black uppercase">Clear</button>
+          </div>
+
+          <div id="message" class="hidden rounded-2xl p-4 text-sm"></div>
+
+          <section id="feedback-panel" class="hidden rounded-[1.5rem] border border-cyan-400/20 bg-slate-950/50 p-5">
+            <div class="flex gap-4 items-center mb-5">
+              <div id="evaluation" class="eval-badge">-</div>
+              <div>
+                <div class="text-[10px] tracking-[0.25em] text-cyan-200 font-black uppercase">AI Feedback</div>
+                <p id="overall" class="text-slate-100 font-bold mt-2"></p>
+              </div>
+            </div>
+            <div class="grid md:grid-cols-2 gap-3 text-sm">
+              <div class="rounded-2xl bg-emerald-400/10 border border-emerald-300/20 p-4"><div class="text-emerald-200 font-black text-xs mb-2">良い点</div><p id="good"></p></div>
+              <div class="rounded-2xl bg-amber-400/10 border border-amber-300/20 p-4"><div class="text-amber-200 font-black text-xs mb-2">直すと良い点</div><p id="improve"></p></div>
+              <div class="rounded-2xl bg-cyan-400/10 border border-cyan-300/20 p-4"><div class="text-cyan-200 font-black text-xs mb-2">次に意識すること</div><p id="next"></p></div>
+              <div class="rounded-2xl bg-rose-400/10 border border-rose-300/20 p-4"><div class="text-rose-200 font-black text-xs mb-2">事実確認</div><p id="fact-check"></p></div>
+            </div>
+            <div id="extra-notes" class="mt-3 text-xs text-slate-300 space-y-2"></div>
+          </section>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <script src="./common/science-shared.js"></script>
+  <script>
+    const SHARED = window.ScienceShared || {};
+    const GAS_URL = SHARED.gasUrl || "https://script.google.com/macros/s/AKfycbzeWJEO744NJfJrUnQJaKSS5H5_PQqUB4wsvAC3PWHblTmyW5oq8ZsGHgXaKuG6z8lJ2w/exec";
+    const SPREADSHEET_URL = "https://docs.google.com/spreadsheets/d/1LCGCVjeiTicyclXFTP0EaxxB_RluZJrveWPo1FdLzsk/edit";
+    const SPREADSHEET_ID = (SPREADSHEET_URL.match(/\/d\/([^/]+)/) || [])[1] || "";
+    const normalizeUserName = SHARED.normalizeUserName || ((name) => name ? name.normalize("NFKC").trim() : "");
+
+    let writingProblems = [];
+    let selectedProblem = null;
+    let writingConfig = { writingAiEnabled: false, writingMaxChars: 300, writingModel: "gpt-5.4-nano" };
+    let usage = {};
+
+    const el = (id) => document.getElementById(id);
+    const userId = () => `${el("user-class").value.trim()}-${el("user-number").value.trim()}-${normalizeUserName(el("user-name").value)}`;
+    const isProfileReady = () => el("user-class").value.trim() && el("user-number").value.trim() && normalizeUserName(el("user-name").value);
+
+    function showMessage(text, type = "info") {
+      const box = el("message");
+      box.className = "rounded-2xl p-4 text-sm";
+      box.classList.remove("hidden");
+      const styles = {
+        info: "bg-cyan-400/10 border border-cyan-300/20 text-cyan-100",
+        error: "bg-rose-400/10 border border-rose-300/20 text-rose-100",
+        ok: "bg-lime-400/10 border border-lime-300/20 text-lime-100"
+      };
+      box.className += " " + (styles[type] || styles.info);
+      box.textContent = text;
+    }
+
+    function saveProfile() {
+      const name = normalizeUserName(el("user-name").value);
+      localStorage.setItem("ethics_user_class", el("user-class").value.trim());
+      localStorage.setItem("ethics_user_number", el("user-number").value.trim());
+      localStorage.setItem("ethics_user_name", name);
+      el("user-name").value = name;
+      showMessage("ユーザー情報を保存しました。", "ok");
+      syncWriting();
+    }
+
+    function loadProfile() {
+      el("user-class").value = localStorage.getItem("ethics_user_class") || "";
+      el("user-number").value = localStorage.getItem("ethics_user_number") || "";
+      el("user-name").value = localStorage.getItem("ethics_user_name") || "";
+    }
+
+    async function fetchJson(params) {
+      const url = `${GAS_URL}?${new URLSearchParams(params).toString()}`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      return data;
+    }
+
+    function renderLimits() {
+      const daily = usage.dailyRemaining === null || usage.dailyRemaining === undefined ? "無制限" : `${usage.dailyRemaining}回`;
+      const monthly = usage.monthlyRemaining === null || usage.monthlyRemaining === undefined ? "無制限" : `${usage.monthlyRemaining}回`;
+      const state = writingConfig.writingAiEnabled ? "ON" : "OFF";
+      el("limit-status").innerHTML = `AIフィードバック: <b>${state}</b><br>本日の残り: <b>${daily}</b> / 今月全体の残り: <b>${monthly}</b><br>model: <b>${writingConfig.writingModel || "gpt-5.4-nano"}</b>`;
+    }
+
+    function renderProblems() {
+      const list = el("problem-list");
+      list.innerHTML = "";
+      el("task-count").textContent = `${writingProblems.length} tasks`;
+      if (!writingProblems.length) {
+        list.innerHTML = `<div class="text-sm text-slate-400 rounded-2xl border border-slate-800 bg-slate-950/40 p-4">表示できる記述問題がありません。</div>`;
+        return;
+      }
+      writingProblems.forEach((problem) => {
+        const button = document.createElement("button");
+        button.className = "problem-card rounded-2xl p-4 text-left w-full";
+        button.dataset.problemId = problem.problemId;
+        button.innerHTML = `
+          <div class="flex justify-between gap-3 mb-2">
+            <span class="text-[10px] text-cyan-200 font-black">${problem.unit || "単元未設定"}</span>
+            <span class="text-[10px] text-slate-400">${problem.maxChars || writingConfig.writingMaxChars}字まで</span>
+          </div>
+          <div class="text-sm font-bold leading-relaxed">${escapeHtml(problem.prompt)}</div>
+        `;
+        button.addEventListener("click", () => selectProblem(problem.problemId));
+        list.appendChild(button);
+      });
+    }
+
+    function selectProblem(problemId) {
+      selectedProblem = writingProblems.find((p) => p.problemId === problemId) || null;
+      if (!selectedProblem) return;
+      document.querySelectorAll(".problem-card").forEach((card) => card.classList.toggle("active", card.dataset.problemId === problemId));
+      el("empty-state").classList.add("hidden");
+      el("writing-area").classList.remove("hidden");
+      el("feedback-panel").classList.add("hidden");
+      el("message").classList.add("hidden");
+      el("selected-unit").textContent = selectedProblem.unit || "単元未設定";
+      el("selected-grade").textContent = selectedProblem.grade || "学年未設定";
+      el("max-chars").textContent = `${selectedProblem.maxChars || writingConfig.writingMaxChars}字まで`;
+      el("prompt").textContent = selectedProblem.prompt;
+      updateCharCount();
+    }
+
+    function updateCharCount() {
+      const max = selectedProblem ? selectedProblem.maxChars : writingConfig.writingMaxChars;
+      const count = el("answer").value.length;
+      el("char-count").textContent = `${count} / ${max}`;
+      el("char-count").className = count > max ? "text-xs text-rose-300 font-bold" : "text-xs text-slate-400";
+    }
+
+    async function syncWriting() {
+      try {
+        const params = { action: "syncWriting", id: SPREADSHEET_ID };
+        if (isProfileReady()) params.userId = userId();
+        const data = await fetchJson(params);
+        writingProblems = data.problems || [];
+        writingConfig = data.config || writingConfig;
+        usage = data.usage || {};
+        renderLimits();
+        renderProblems();
+      } catch (err) {
+        showMessage(`同期に失敗しました: ${err.message}`, "error");
+      }
+    }
+
+    async function requestFeedback() {
+      if (!selectedProblem) return showMessage("記述問題を選んでください。", "error");
+      if (!isProfileReady()) return showMessage("クラス・番号・名前を保存してください。", "error");
+      const answer = el("answer").value.trim();
+      if (!answer) return showMessage("回答が空欄です。", "error");
+      if (answer.length > selectedProblem.maxChars) return showMessage(`回答が上限の${selectedProblem.maxChars}字を超えています。`, "error");
+      if (!writingConfig.writingAiEnabled) return showMessage("現在、記述AIフィードバックはOFFです。", "error");
+
+      const button = el("feedback-btn");
+      button.disabled = true;
+      button.classList.add("opacity-60");
+      showMessage("フィードバックを作成しています...", "info");
+      try {
+        const data = await fetchJson({
+          action: "gradeWriting",
+          id: SPREADSHEET_ID,
+          userId: userId(),
+          userName: normalizeUserName(el("user-name").value),
+          userClass: el("user-class").value.trim(),
+          userNumber: el("user-number").value.trim(),
+          problemId: selectedProblem.problemId,
+          answer
+        });
+        renderFeedback(data.feedback || {});
+        showMessage("フィードバックを記録しました。", "ok");
+        await syncWriting();
+      } catch (err) {
+        showMessage(err.message, "error");
+      } finally {
+        button.disabled = false;
+        button.classList.remove("opacity-60");
+      }
+    }
+
+    function renderFeedback(feedback) {
+      el("feedback-panel").classList.remove("hidden");
+      el("evaluation").textContent = feedback.evaluation || "-";
+      el("overall").textContent = feedback.overall || "コメントはありません。";
+      el("good").textContent = feedback.good || "--";
+      el("improve").textContent = feedback.improve || "--";
+      el("next").textContent = feedback.next || "--";
+      el("fact-check").textContent = feedback.factCheck || "--";
+      const notes = [];
+      if (feedback.misconception) notes.push(`<div><b class="text-rose-200">事実誤認:</b> ${escapeHtml(feedback.misconception)}</div>`);
+      if (feedback.variationNote) notes.push(`<div><b class="text-cyan-200">補足:</b> ${escapeHtml(feedback.variationNote)}</div>`);
+      el("extra-notes").innerHTML = notes.join("");
+    }
+
+    function escapeHtml(value) {
+      return String(value || "").replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
+    }
+
+    el("save-profile-btn").addEventListener("click", saveProfile);
+    el("sync-btn").addEventListener("click", syncWriting);
+    el("feedback-btn").addEventListener("click", requestFeedback);
+    el("clear-btn").addEventListener("click", () => {
+      el("answer").value = "";
+      el("feedback-panel").classList.add("hidden");
+      el("message").classList.add("hidden");
+      updateCharCount();
+    });
+    el("answer").addEventListener("input", updateCharCount);
+
+    loadProfile();
+    syncWriting();
+  </script>
+</body>
+</html>
