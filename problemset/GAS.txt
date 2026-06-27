@@ -1576,7 +1576,7 @@ function getWritingProblemHeaders() {
 }
 
 function getWritingLogHeaders() {
-  return ["日時", "ユーザーID", "ユーザー名", "クラス", "番号", "problemId", "単元", "学年", "回答", "評価", "AIコメント", "良い点", "直すと良い点", "次に意識すること", "事実確認", "事実誤認", "複数説補足", "model", "status", "requestTokens", "responseTokens"];
+  return ["日時", "ユーザーID", "ユーザー名", "クラス", "番号", "problemId", "単元", "学年", "回答", "評価", "AIコメント", "良い点", "直すと良い点", "次に意識すること", "事実確認", "事実誤認", "複数説補足", "model", "status", "requestTokens", "responseTokens", "評価レベル", "parseStatus"];
 }
 
 function ensureSheetWithHeaders(ss, sheetName, headers) {
@@ -1632,6 +1632,16 @@ function parseWritingEnabled(value) {
 function normalizeWritingEvaluation(value) {
   const s = String(value || '').trim().toUpperCase();
   return ["S", "A", "B", "C"].indexOf(s) >= 0 ? s : "C";
+}
+
+function normalizeWritingFeedbackLevel(value) {
+  const s = String(value || '').trim();
+  if (["中学生", "高校生", "先生"].indexOf(s) >= 0) return s;
+  const lower = s.toLowerCase();
+  if (["middle", "junior", "junior-high", "junior_high"].indexOf(lower) >= 0) return "中学生";
+  if (["high", "high-school", "high_school"].indexOf(lower) >= 0) return "高校生";
+  if (["teacher", "strict"].indexOf(lower) >= 0) return "先生";
+  return "中学生";
 }
 
 function getWritingSheets(ss) {
@@ -1710,18 +1720,35 @@ function findWritingProblemById(problems, problemId) {
   return null;
 }
 
-function buildWritingPrompt(problem, answer) {
+function getWritingFeedbackLevelInstruction(level) {
+  const normalized = normalizeWritingFeedbackLevel(level);
+  if (normalized === "高校生") {
+    return "評価レベル: 高校生。用語の正確さ、因果関係、科学的な根拠の明確さを中学生より少し厳密に見てください。";
+  }
+  if (normalized === "先生") {
+    return "評価レベル: 先生。授業者の確認用として、事実誤認、不足している観点、論理の飛躍をやや厳密に見てください。";
+  }
+  return "評価レベル: 中学生。用語の完璧さよりも、現象の流れを自分の言葉で説明できているかを重視してください。";
+}
+
+function buildWritingPrompt(problem, answer, feedbackLevel) {
+  const level = normalizeWritingFeedbackLevel(feedbackLevel);
   return [
-    "あなたは中学生向け理科の学習支援者です。これは正式成績ではなく練習用フィードバックです。",
+    "あなたは理科の記述問題に対する学習支援者です。これは正式成績ではなく練習用フィードバックです。",
+    getWritingFeedbackLevelInstruction(level),
     "評価はS/A/B/Cのみ。学年相応の理解、科学的思考、根拠の明確さを重視してください。",
-    "事実誤認はやわらかくても明確に指摘してください。複数の見方や条件差がある場合は補足してください。",
-    "コメントは短くしてください。",
+    "文体はていねいで、やわらかく、女子中高生が受け入れやすい表現にしてください。",
+    "事実誤認は傷つけない言い方で、しかし内容としては明確に指摘してください。",
+    "複数の見方や条件差がある場合は、断定しすぎず補足してください。",
+    "コメントは短くしてください。各項目は一文を基本にしてください。",
     "出力は必ずJSONオブジェクトだけにしてください。Markdown、コードブロック、前置き、説明文は出力しないでください。",
     "全てのキーを必ず含め、値は文字列にしてください。",
+    "JSONは必ず { で始め、} で終えてください。途中で文章を切らないでください。",
     "",
     "出力JSON形式:",
-    '{"evaluation":"S|A|B|C","overall":"80字以内","good":"80字以内","improve":"80字以内","next":"80字以内","factCheck":"80字以内","misconception":"80字以内または空","variationNote":"80字以内または空"}',
+    '{"evaluation":"S|A|B|C","overall":"60字以内","good":"60字以内","improve":"60字以内","next":"60字以内","factCheck":"60字以内","misconception":"60字以内または空","variationNote":"60字以内または空"}',
     "",
+    "選択された評価レベル: " + level,
     "学年: " + (problem.grade || "未指定"),
     "単元: " + (problem.unit || "未指定"),
     "問題: " + problem.prompt,
@@ -1773,6 +1800,19 @@ function extractJsonStringField(text, key) {
     .trim();
 }
 
+function stripLikelyJsonText(text) {
+  return String(text || '')
+    .replace(/^```json\s*/i, '')
+    .replace(/^```\s*/i, '')
+    .replace(/```\s*$/i, '')
+    .trim();
+}
+
+function isLikelyRawJson(text) {
+  const raw = stripLikelyJsonText(text);
+  return raw.charAt(0) === "{" || raw.indexOf('"evaluation"') >= 0 || raw.indexOf('"overall"') >= 0;
+}
+
 function parseWritingFeedbackFields(text) {
   const evaluation = extractJsonStringField(text, "evaluation");
   const overall = extractJsonStringField(text, "overall");
@@ -1799,23 +1839,29 @@ function parseWritingFeedbackText(text) {
   const jsonText = extractJsonObjectFromText(text);
   if (jsonText) {
     try {
-      return JSON.parse(jsonText);
+      const parsed = JSON.parse(jsonText);
+      parsed.parseStatus = "ok";
+      return parsed;
     } catch (e) {
       // JSON抽出できても壊れている場合は下の安全フォールバックに回す
     }
   }
   const fields = parseWritingFeedbackFields(text);
-  if (fields) return fields;
+  if (fields) {
+    fields.parseStatus = "partial";
+    return fields;
+  }
   const fallback = String(text || '').trim();
   return {
     evaluation: "C",
-    overall: fallback ? fallback.slice(0, 220) : "フィードバックの形式を整えられませんでした。先生に確認してください。",
+    overall: fallback && !isLikelyRawJson(fallback) ? fallback.slice(0, 120) : "フィードバックの一部を整えられませんでした。必要ならもう一度試してください。",
     good: "",
     improve: "",
     next: "",
     factCheck: "",
     misconception: "",
-    variationNote: ""
+    variationNote: "",
+    parseStatus: "fallback"
   };
 }
 
@@ -1827,7 +1873,7 @@ function callOpenAiWritingFeedback(model, prompt) {
     contentType: "application/json",
     headers: { Authorization: "Bearer " + apiKey },
     muteHttpExceptions: true,
-    payload: JSON.stringify({ model: model, input: prompt, max_output_tokens: 900 })
+    payload: JSON.stringify({ model: model, input: prompt, max_output_tokens: 1400 })
   });
   const code = response.getResponseCode();
   const body = response.getContentText();
@@ -1854,7 +1900,8 @@ function callOpenAiWritingFeedback(model, prompt) {
       next: String(parsed.next || '').trim(),
       factCheck: String(parsed.factCheck || '').trim(),
       misconception: String(parsed.misconception || '').trim(),
-      variationNote: String(parsed.variationNote || '').trim()
+      variationNote: String(parsed.variationNote || '').trim(),
+      parseStatus: String(parsed.parseStatus || "fallback").trim()
     },
     requestTokens: usage.input_tokens || "",
     responseTokens: usage.output_tokens || ""
@@ -1916,6 +1963,7 @@ function handleGradeWriting(p) {
     const userNumber = String(p.userNumber || '').trim();
     const problemId = String(p.problemId || '').trim();
     const answer = String(p.answer || '').trim();
+    const feedbackLevel = normalizeWritingFeedbackLevel(p.feedbackLevel || "中学生");
     if (!userId || !userName) return returnJson({ error: "ユーザー情報が不足しています。" });
     if (!problemId) return returnJson({ error: "問題IDが指定されていません。" });
     if (!answer) return returnJson({ error: "回答が空欄です。" });
@@ -1932,12 +1980,13 @@ function handleGradeWriting(p) {
     if (monthlyLimit > 0 && usage.monthly >= monthlyLimit) return returnJson({ error: "今月の全体フィードバック上限に達しています。", usage: usage });
 
     const model = runtimeConfig.writingModel || "gpt-5.4-nano";
-    const feedback = callOpenAiWritingFeedback(model, buildWritingPrompt(problem, answer));
+    const feedback = callOpenAiWritingFeedback(model, buildWritingPrompt(problem, answer, feedbackLevel));
     if (!feedback.ok) {
       appendWritingLog(sheets.logSheet, {
         "日時": new Date(), "ユーザーID": userId, "ユーザー名": userName, "クラス": userClass, "番号": userNumber,
         "problemId": problemId, "単元": problem.unit, "学年": problem.grade, "回答": answer, "評価": "",
-        "AIコメント": feedback.error || "", "model": model, "status": feedback.status || "api_error"
+        "AIコメント": feedback.error || "", "model": model, "status": feedback.status || "api_error",
+        "評価レベル": feedbackLevel, "parseStatus": "api_error"
       });
       return returnJson({ error: "フィードバックを作成できませんでした: " + (feedback.error || "API error"), status: feedback.status || "api_error" });
     }
@@ -1947,9 +1996,10 @@ function handleGradeWriting(p) {
       "problemId": problemId, "単元": problem.unit, "学年": problem.grade, "回答": answer, "評価": result.evaluation,
       "AIコメント": result.overall, "良い点": result.good, "直すと良い点": result.improve, "次に意識すること": result.next,
       "事実確認": result.factCheck, "事実誤認": result.misconception, "複数説補足": result.variationNote,
-      "model": model, "status": "ok", "requestTokens": feedback.requestTokens, "responseTokens": feedback.responseTokens
+      "model": model, "status": "ok", "requestTokens": feedback.requestTokens, "responseTokens": feedback.responseTokens,
+      "評価レベル": feedbackLevel, "parseStatus": result.parseStatus || "fallback"
     });
-    return returnJson({ success: true, feedback: result, model: model });
+    return returnJson({ success: true, feedback: result, model: model, feedbackLevel: feedbackLevel, parseStatus: result.parseStatus || "fallback" });
   } catch (err) {
     return returnJson({ error: "記述フィードバック処理に失敗しました: " + err.toString() });
   } finally {

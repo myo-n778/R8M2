@@ -121,6 +121,16 @@
             <h2 id="prompt" class="text-xl md:text-2xl font-black leading-relaxed"></h2>
           </div>
 
+          <div class="rounded-2xl bg-slate-950/45 border border-slate-800 p-4">
+            <label for="feedback-level" class="block text-xs font-black uppercase text-slate-300 mb-2">Feedback Level</label>
+            <select id="feedback-level" class="w-full bg-slate-950/70 border border-slate-700 rounded-xl px-3 py-3 text-sm outline-none focus:border-cyan-400">
+              <option value="中学生">中学生</option>
+              <option value="高校生">高校生</option>
+              <option value="先生">先生</option>
+            </select>
+            <p class="text-[11px] text-slate-400 mt-2">評価の厳しさとコメントの観点を切り替えます。初期設定は中学生です。</p>
+          </div>
+
           <div>
             <div class="flex justify-between items-center mb-2">
               <label for="answer" class="text-xs font-black uppercase text-slate-300">Your Answer</label>
@@ -171,6 +181,7 @@
     let selectedProblem = null;
     let writingConfig = { writingAiEnabled: false, writingMaxChars: 300, writingModel: "gpt-5.4-nano" };
     let usage = {};
+    const FEEDBACK_LEVELS = ["中学生", "高校生", "先生"];
 
     const el = (id) => document.getElementById(id);
     const userId = () => `${el("user-class").value.trim()}-${el("user-number").value.trim()}-${normalizeUserName(el("user-name").value)}`;
@@ -203,6 +214,13 @@
       el("user-class").value = localStorage.getItem("ethics_user_class") || "";
       el("user-number").value = localStorage.getItem("ethics_user_number") || "";
       el("user-name").value = localStorage.getItem("ethics_user_name") || "";
+      const savedLevel = localStorage.getItem("writing_feedback_level") || "中学生";
+      el("feedback-level").value = FEEDBACK_LEVELS.includes(savedLevel) ? savedLevel : "中学生";
+    }
+
+    function feedbackLevel() {
+      const value = el("feedback-level").value;
+      return FEEDBACK_LEVELS.includes(value) ? value : "中学生";
     }
 
     async function fetchJson(params) {
@@ -307,6 +325,7 @@
           userClass: el("user-class").value.trim(),
           userNumber: el("user-number").value.trim(),
           problemId: selectedProblem.problemId,
+          feedbackLevel: feedbackLevel(),
           answer
         });
         renderFeedback(data.feedback || {});
@@ -329,6 +348,9 @@
       el("next").textContent = feedback.next || "--";
       el("fact-check").textContent = feedback.factCheck || "--";
       const notes = [];
+      if (feedback.parseStatus && feedback.parseStatus !== "ok") {
+        notes.push(`<div><b class="text-amber-200">注意:</b> 一部のフィードバックだけ表示されています。必要ならもう一度試してください。</div>`);
+      }
       if (feedback.misconception) notes.push(`<div><b class="text-rose-200">事実誤認:</b> ${escapeHtml(feedback.misconception)}</div>`);
       if (feedback.variationNote) notes.push(`<div><b class="text-cyan-200">補足:</b> ${escapeHtml(feedback.variationNote)}</div>`);
       el("extra-notes").innerHTML = notes.join("");
@@ -341,6 +363,7 @@
     el("save-profile-btn").addEventListener("click", saveProfile);
     el("sync-btn").addEventListener("click", syncWriting);
     el("feedback-btn").addEventListener("click", requestFeedback);
+    el("feedback-level").addEventListener("change", () => localStorage.setItem("writing_feedback_level", feedbackLevel()));
     el("clear-btn").addEventListener("click", () => {
       el("answer").value = "";
       el("feedback-panel").classList.add("hidden");
