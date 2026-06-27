@@ -1683,6 +1683,48 @@ function readWritingProblems(ss, runtimeConfig) {
   return problems;
 }
 
+function compareWritingEvaluation(a, b) {
+  const rank = { S: 4, A: 3, B: 2, C: 1 };
+  return (rank[normalizeWritingEvaluation(a)] || 0) - (rank[normalizeWritingEvaluation(b)] || 0);
+}
+
+function getWritingBestResultsByProblem(logSheet, userId) {
+  const values = logSheet.getDataRange().getValues();
+  if (!values || values.length <= 1 || !userId) return {};
+  const headers = values[0].map(function(h) { return String(h || '').trim(); });
+  const map = getHeaderIndexMap(headers);
+  const userIdx = map["ユーザーID"];
+  const problemIdx = map["problemId"];
+  const evalIdx = map["評価"];
+  const dateIdx = map["日時"];
+  const statusIdx = map["status"];
+  const results = {};
+  if (problemIdx === undefined || evalIdx === undefined || dateIdx === undefined) return results;
+  for (let i = 1; i < values.length; i++) {
+    const row = values[i];
+    if (userIdx !== undefined && String(row[userIdx] || '') !== String(userId || '')) continue;
+    if (statusIdx !== undefined && String(row[statusIdx] || '').trim() !== "ok") continue;
+    const problemId = String(row[problemIdx] || '').trim();
+    const evaluation = normalizeWritingEvaluation(row[evalIdx]);
+    if (!problemId || !evaluation) continue;
+    const rawDate = row[dateIdx];
+    const date = rawDate instanceof Date ? rawDate : new Date(rawDate);
+    const dateMs = isNaN(date.getTime()) ? 0 : date.getTime();
+    const current = results[problemId];
+    if (!current || compareWritingEvaluation(evaluation, current.evaluation) > 0 || (evaluation === current.evaluation && dateMs > current.dateMs)) {
+      results[problemId] = {
+        evaluation: evaluation,
+        date: dateMs ? Utilities.formatDate(date, "Asia/Tokyo", "yyyy/MM/dd") : "",
+        dateMs: dateMs
+      };
+    }
+  }
+  Object.keys(results).forEach(function(problemId) {
+    delete results[problemId].dateMs;
+  });
+  return results;
+}
+
 function getWritingUsageCounts(logSheet, userId) {
   const values = logSheet.getDataRange().getValues();
   const now = new Date();
@@ -1923,8 +1965,10 @@ function handleSyncWriting(p) {
     const usage = getWritingUsageCounts(sheets.logSheet, userId);
     const dailyLimit = Number(runtimeConfig.writingDailyLimitPerUser) || 0;
     const monthlyLimit = Number(runtimeConfig.writingMonthlyLimitTotal) || 0;
+    const bestResults = getWritingBestResultsByProblem(sheets.logSheet, userId);
     const problems = readWritingProblems(ss, runtimeConfig).map(function(problem) {
-      return { problemId: problem.problemId, unit: problem.unit, grade: problem.grade, prompt: problem.prompt, maxChars: problem.maxChars, order: problem.order };
+      const best = bestResults[problem.problemId] || null;
+      return { problemId: problem.problemId, unit: problem.unit, grade: problem.grade, prompt: problem.prompt, maxChars: problem.maxChars, order: problem.order, bestEvaluation: best ? best.evaluation : "", bestEvaluationDate: best ? best.date : "" };
     });
     return returnJson({
       success: true,

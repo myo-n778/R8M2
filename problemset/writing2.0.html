@@ -34,6 +34,24 @@
       color: #e5f4ff;
       font-family: "Noto Sans JP", "Hiragino Sans", "Yu Gothic", sans-serif;
     }
+    body.theme-lime {
+      background:
+        radial-gradient(circle at 12% 18%, rgba(163, 230, 53, 0.18), transparent 32rem),
+        radial-gradient(circle at 82% 6%, rgba(34, 211, 238, 0.10), transparent 26rem),
+        linear-gradient(135deg, #0c160f 0%, #111827 54%, #0f172a 100%);
+    }
+    body.theme-amber {
+      background:
+        radial-gradient(circle at 12% 18%, rgba(251, 191, 36, 0.18), transparent 32rem),
+        radial-gradient(circle at 82% 6%, rgba(34, 211, 238, 0.10), transparent 26rem),
+        linear-gradient(135deg, #171206 0%, #111827 54%, #0f172a 100%);
+    }
+    body.theme-rose {
+      background:
+        radial-gradient(circle at 12% 18%, rgba(251, 113, 133, 0.18), transparent 32rem),
+        radial-gradient(circle at 82% 6%, rgba(34, 211, 238, 0.10), transparent 26rem),
+        linear-gradient(135deg, #190b13 0%, #111827 54%, #0f172a 100%);
+    }
     .font-tech { font-family: "Orbitron", "Noto Sans JP", sans-serif; }
     .glass {
       background: var(--panel);
@@ -79,38 +97,49 @@
       outline: none;
     }
     .input-compact:focus { border-color: var(--accent); }
+    .feedback-copy { font-size: 0.98rem; line-height: 1.75; }
     details > summary { list-style: none; }
     details > summary::-webkit-details-marker { display: none; }
   </style>
 </head>
 <body>
   <main class="max-w-[1500px] mx-auto px-4 py-4 md:py-6">
-    <header class="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4 mb-4">
+    <header class="grid xl:grid-cols-[auto_1fr] gap-4 mb-4 items-start">
       <div>
         <div class="font-tech text-[10px] tracking-[0.42em] text-cyan-200/80 font-black uppercase">SCIENCE 2026</div>
         <h1 class="text-3xl md:text-5xl font-black tracking-tight mt-1">Writing Feedback</h1>
-        <p class="text-slate-300 text-sm mt-2">記述問題の練習用フィードバックです。EXPやランキングには入りません。</p>
       </div>
-      <div class="flex flex-wrap items-center gap-2">
-        <a href="./science2.0.html" class="chip rounded-full px-4 py-2 text-xs font-black uppercase"><i class="fa-solid fa-arrow-left"></i> Selection</a>
-        <button id="sync-btn" class="chip rounded-full px-4 py-2 text-xs font-black uppercase"><i class="fa-solid fa-rotate"></i> Sync</button>
-        <button id="theme-btn" class="chip rounded-full px-4 py-2 text-xs font-black uppercase"><i class="fa-solid fa-palette"></i> Theme</button>
+      <div class="glass rounded-[1.4rem] p-3 xl:justify-self-end w-full xl:max-w-[920px]">
+        <div class="grid md:grid-cols-[auto_1fr_auto_auto] gap-2 items-center">
+          <div class="flex items-center gap-2">
+            <span class="font-tech text-[10px] text-slate-400 font-black tracking-[0.2em] uppercase">USER</span>
+            <input id="user-class" class="input-compact px-3 py-2 text-sm w-20" placeholder="クラス">
+            <input id="user-number" class="input-compact px-3 py-2 text-sm w-20" placeholder="番号">
+            <input id="user-name" class="input-compact px-3 py-2 text-sm w-36" placeholder="名前">
+            <button id="save-profile-btn" class="bg-cyan-500 hover:bg-cyan-400 text-slate-950 rounded-xl px-3 py-2 text-xs font-black uppercase">Save</button>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="font-tech text-[10px] text-slate-400 font-black tracking-[0.16em] uppercase">Level</span>
+            <select id="feedback-level" class="input-compact px-3 py-2 text-sm w-28">
+              <option value="中学生">中学生</option>
+              <option value="高校生">高校生</option>
+              <option value="先生">先生</option>
+            </select>
+          </div>
+          <details class="relative">
+            <summary class="chip cursor-pointer rounded-full px-4 py-2 text-xs font-black uppercase"><i class="fa-solid fa-gauge-high"></i> Usage</summary>
+            <div id="limit-status" class="absolute right-0 z-20 mt-2 w-72 rounded-xl bg-slate-950 border border-slate-700 p-3 text-xs text-slate-300 shadow-2xl">同期してください。</div>
+          </details>
+          <div class="flex gap-2 justify-end">
+            <a href="./science2.0.html" class="chip rounded-full px-4 py-2 text-xs font-black uppercase"><i class="fa-solid fa-arrow-left"></i> Selection</a>
+            <button id="sync-btn" class="chip rounded-full px-4 py-2 text-xs font-black uppercase"><i class="fa-solid fa-rotate"></i> Sync</button>
+            <button id="theme-btn" class="chip rounded-full px-4 py-2 text-xs font-black uppercase"><i class="fa-solid fa-palette"></i> Theme</button>
+          </div>
+        </div>
       </div>
     </header>
 
-    <section id="profile-panel" class="glass rounded-[1.4rem] p-3 mb-4">
-      <div class="grid lg:grid-cols-[auto_1fr_auto] gap-3 items-center">
-        <div class="font-tech text-[10px] text-slate-400 font-black tracking-[0.2em] uppercase">USER</div>
-        <div class="grid grid-cols-3 gap-2">
-          <input id="user-class" class="input-compact px-3 py-2 text-sm" placeholder="クラス">
-          <input id="user-number" class="input-compact px-3 py-2 text-sm" placeholder="番号">
-          <input id="user-name" class="input-compact px-3 py-2 text-sm" placeholder="名前">
-        </div>
-        <button id="save-profile-btn" class="bg-cyan-500 hover:bg-cyan-400 text-slate-950 rounded-xl px-4 py-2 text-xs font-black uppercase">Save</button>
-      </div>
-    </section>
-
-    <section class="grid xl:grid-cols-[minmax(0,1fr)_460px] gap-4 items-start">
+    <section class="grid xl:grid-cols-[520px_minmax(0,1fr)_360px] gap-4 items-start">
       <section class="glass rounded-[1.8rem] p-4 md:p-5 min-h-[40rem]">
         <div id="message" class="hidden rounded-2xl p-4 text-sm mb-4"></div>
 
@@ -132,23 +161,13 @@
             <h2 id="prompt" class="text-xl md:text-3xl font-black leading-relaxed"></h2>
           </div>
 
-          <div class="grid md:grid-cols-[1fr_220px] gap-3 items-end">
+          <div>
             <div>
               <div class="flex justify-between items-center mb-2">
                 <label for="answer" class="font-tech text-[10px] font-black uppercase text-slate-300 tracking-[0.18em]">Your Answer</label>
                 <span id="char-count" class="text-xs text-slate-400">0 / 300</span>
               </div>
               <textarea id="answer" class="w-full bg-slate-950/70 border border-slate-700 rounded-2xl p-4 text-base md:text-lg leading-relaxed outline-none focus:border-cyan-400" placeholder="ここに自分の考えを書きます。短くても送れます。"></textarea>
-            </div>
-
-            <div class="rounded-2xl bg-slate-950/45 border border-slate-800 p-4">
-              <label for="feedback-level" class="block font-tech text-[10px] font-black uppercase text-slate-300 mb-2 tracking-[0.16em]">Level</label>
-              <select id="feedback-level" class="w-full bg-slate-950/70 border border-slate-700 rounded-xl px-3 py-3 text-sm outline-none focus:border-cyan-400">
-                <option value="中学生">中学生</option>
-                <option value="高校生">高校生</option>
-                <option value="先生">先生</option>
-              </select>
-              <p class="text-[11px] text-slate-400 mt-2 leading-relaxed">評価の厳しさと観点を切り替えます。</p>
             </div>
           </div>
 
@@ -162,36 +181,29 @@
         </div>
       </section>
 
+      <section id="feedback-panel" class="hidden glass rounded-[1.8rem] p-4 xl:sticky xl:top-4">
+        <div class="flex gap-3 items-start mb-4">
+          <div id="evaluation" class="eval-badge">-</div>
+          <div>
+            <div class="font-tech text-[10px] tracking-[0.25em] text-cyan-200 font-black uppercase">Feedback</div>
+            <p id="overall" class="text-slate-100 font-bold mt-2 leading-relaxed feedback-copy"></p>
+          </div>
+        </div>
+        <div class="space-y-3 text-sm">
+          <div class="rounded-2xl bg-emerald-400/10 border border-emerald-300/20 p-4"><div class="text-emerald-200 font-black text-xs mb-2">良い点</div><p id="good" class="feedback-copy"></p></div>
+          <div class="rounded-2xl bg-amber-400/10 border border-amber-300/20 p-4"><div class="text-amber-200 font-black text-xs mb-2">直すと良い点</div><p id="improve" class="feedback-copy"></p></div>
+          <div class="rounded-2xl bg-cyan-400/10 border border-cyan-300/20 p-4"><div class="text-cyan-200 font-black text-xs mb-2">書くときのポイント</div><p id="next" class="feedback-copy"></p></div>
+        </div>
+        <div id="extra-notes" class="mt-3 text-sm text-slate-300 space-y-2 leading-relaxed"></div>
+      </section>
+
       <aside class="space-y-4 xl:sticky xl:top-4">
         <section class="glass rounded-[1.8rem] p-4">
           <div class="flex items-center justify-between gap-3 mb-3">
             <h2 class="font-tech text-xs font-black uppercase tracking-[0.18em] text-cyan-200">Session Library</h2>
             <span id="task-count" class="text-[10px] text-slate-400 font-bold">0 tasks</span>
           </div>
-          <details class="mb-3">
-            <summary class="cursor-pointer rounded-xl border border-slate-800 bg-slate-950/40 p-3 text-xs text-slate-300 flex justify-between items-center">
-              <span><i class="fa-solid fa-gauge-high text-cyan-200"></i> AI利用状況</span>
-              <i class="fa-solid fa-chevron-down text-slate-500"></i>
-            </summary>
-            <div id="limit-status" class="rounded-xl bg-slate-950/50 border border-slate-800 p-3 text-xs text-slate-300 mt-2">同期してください。</div>
-          </details>
           <div id="problem-list" class="space-y-2 max-h-72 overflow-y-auto pr-1"></div>
-        </section>
-
-        <section id="feedback-panel" class="hidden glass rounded-[1.8rem] p-4">
-          <div class="flex gap-3 items-start mb-4">
-            <div id="evaluation" class="eval-badge">-</div>
-            <div>
-              <div class="font-tech text-[10px] tracking-[0.25em] text-cyan-200 font-black uppercase">AI Feedback</div>
-              <p id="overall" class="text-slate-100 font-bold mt-2 leading-relaxed"></p>
-            </div>
-          </div>
-          <div class="space-y-3 text-sm">
-            <div class="rounded-2xl bg-emerald-400/10 border border-emerald-300/20 p-4"><div class="text-emerald-200 font-black text-xs mb-2">良い点</div><p id="good" class="leading-relaxed"></p></div>
-            <div class="rounded-2xl bg-amber-400/10 border border-amber-300/20 p-4"><div class="text-amber-200 font-black text-xs mb-2">直すと良い点</div><p id="improve" class="leading-relaxed"></p></div>
-            <div class="rounded-2xl bg-cyan-400/10 border border-cyan-300/20 p-4"><div class="text-cyan-200 font-black text-xs mb-2">書くときのポイント</div><p id="next" class="leading-relaxed"></p></div>
-          </div>
-          <div id="extra-notes" class="mt-3 text-xs text-slate-300 space-y-2 leading-relaxed"></div>
         </section>
       </aside>
     </section>
@@ -255,8 +267,10 @@
     function applyTheme(theme) {
       THEME_MODES.forEach((mode) => document.body.classList.remove(mode));
       const safeTheme = THEME_MODES.includes(theme) ? theme : "theme-cyan";
-      document.body.classList.add(safeTheme);
+      if (safeTheme !== "theme-cyan") document.body.classList.add(safeTheme);
       localStorage.setItem("writing_theme_mode", safeTheme);
+      const themeButton = el("theme-btn");
+      if (themeButton) themeButton.innerHTML = `<i class="fa-solid fa-palette"></i> ${safeTheme.replace("theme-", "").toUpperCase()}`;
     }
 
     function cycleTheme() {
@@ -294,6 +308,7 @@
         const button = document.createElement("button");
         button.className = "problem-card rounded-2xl p-4 text-left w-full";
         button.dataset.problemId = problem.problemId;
+        const bestText = problem.bestEvaluation ? `Best ${escapeHtml(problem.bestEvaluation)}${problem.bestEvaluationDate ? ` / ${escapeHtml(problem.bestEvaluationDate)}` : ""}` : "未挑戦";
         button.innerHTML = `
           <div class="flex justify-between gap-3 mb-2">
             <span class="text-[10px] text-cyan-200 font-black">${problem.unit || "単元未設定"}</span>
@@ -303,6 +318,7 @@
             <i class="fa-solid fa-chevron-right text-[10px] text-slate-500 mt-1"></i>
             <div class="text-sm font-bold leading-relaxed">${escapeHtml(problem.prompt)}</div>
           </div>
+          <div class="mt-3 text-[11px] text-slate-400">${bestText}</div>
         `;
         button.addEventListener("click", () => selectProblem(problem.problemId));
         list.appendChild(button);
@@ -392,9 +408,6 @@
       el("improve").textContent = feedback.improve || "--";
       el("next").textContent = feedback.next || "--";
       const notes = [];
-      if (feedback.parseStatus && feedback.parseStatus !== "ok") {
-        notes.push(`<div><b class="text-amber-200">注意:</b> 一部のフィードバックだけ表示されています。必要ならもう一度試してください。</div>`);
-      }
       const scienceNotes = [feedback.factCheck, feedback.misconception, feedback.variationNote].filter(Boolean);
       if (scienceNotes.length) notes.push(`<div><b class="text-cyan-200">理科の補足:</b> ${scienceNotes.map(escapeHtml).join(" ")}</div>`);
       el("extra-notes").innerHTML = notes.join("");
