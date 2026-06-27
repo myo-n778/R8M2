@@ -156,11 +156,10 @@
                 <p id="overall" class="text-slate-100 font-bold mt-2"></p>
               </div>
             </div>
-            <div class="grid md:grid-cols-2 gap-3 text-sm">
+            <div class="grid md:grid-cols-3 gap-3 text-sm">
               <div class="rounded-2xl bg-emerald-400/10 border border-emerald-300/20 p-4"><div class="text-emerald-200 font-black text-xs mb-2">良い点</div><p id="good"></p></div>
               <div class="rounded-2xl bg-amber-400/10 border border-amber-300/20 p-4"><div class="text-amber-200 font-black text-xs mb-2">直すと良い点</div><p id="improve"></p></div>
-              <div class="rounded-2xl bg-cyan-400/10 border border-cyan-300/20 p-4"><div class="text-cyan-200 font-black text-xs mb-2">次に意識すること</div><p id="next"></p></div>
-              <div class="rounded-2xl bg-rose-400/10 border border-rose-300/20 p-4"><div class="text-rose-200 font-black text-xs mb-2">事実確認</div><p id="fact-check"></p></div>
+              <div class="rounded-2xl bg-cyan-400/10 border border-cyan-300/20 p-4"><div class="text-cyan-200 font-black text-xs mb-2">書くときのポイント</div><p id="next"></p></div>
             </div>
             <div id="extra-notes" class="mt-3 text-xs text-slate-300 space-y-2"></div>
           </section>
@@ -346,13 +345,12 @@
       el("good").textContent = feedback.good || "--";
       el("improve").textContent = feedback.improve || "--";
       el("next").textContent = feedback.next || "--";
-      el("fact-check").textContent = feedback.factCheck || "--";
       const notes = [];
       if (feedback.parseStatus && feedback.parseStatus !== "ok") {
         notes.push(`<div><b class="text-amber-200">注意:</b> 一部のフィードバックだけ表示されています。必要ならもう一度試してください。</div>`);
       }
-      if (feedback.misconception) notes.push(`<div><b class="text-rose-200">事実誤認:</b> ${escapeHtml(feedback.misconception)}</div>`);
-      if (feedback.variationNote) notes.push(`<div><b class="text-cyan-200">補足:</b> ${escapeHtml(feedback.variationNote)}</div>`);
+      const scienceNotes = [feedback.factCheck, feedback.misconception, feedback.variationNote].filter(Boolean);
+      if (scienceNotes.length) notes.push(`<div><b class="text-cyan-200">理科の補足:</b> ${scienceNotes.map(escapeHtml).join(" ")}</div>`);
       el("extra-notes").innerHTML = notes.join("");
     }
 
