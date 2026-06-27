@@ -1715,7 +1715,9 @@ function buildWritingPrompt(problem, answer) {
     "あなたは中学生向け理科の学習支援者です。これは正式成績ではなく練習用フィードバックです。",
     "評価はS/A/B/Cのみ。学年相応の理解、科学的思考、根拠の明確さを重視してください。",
     "事実誤認はやわらかくても明確に指摘してください。複数の見方や条件差がある場合は補足してください。",
-    "コメントは短く、JSONのみで返してください。",
+    "コメントは短くしてください。",
+    "出力は必ずJSONオブジェクトだけにしてください。Markdown、コードブロック、前置き、説明文は出力しないでください。",
+    "全てのキーを必ず含め、値は文字列にしてください。",
     "",
     "出力JSON形式:",
     '{"evaluation":"S|A|B|C","overall":"80字以内","good":"80字以内","improve":"80字以内","next":"80字以内","factCheck":"80字以内","misconception":"80字以内または空","variationNote":"80字以内または空"}',
@@ -1744,6 +1746,43 @@ function parseOpenAiText(data) {
   return chunks.join("\n").trim();
 }
 
+function extractJsonObjectFromText(text) {
+  const raw = String(text || '').trim();
+  if (!raw) return "";
+  const unfenced = raw
+    .replace(/^```json\s*/i, '')
+    .replace(/^```\s*/i, '')
+    .replace(/```\s*$/i, '')
+    .trim();
+  if (unfenced.charAt(0) === "{" && unfenced.charAt(unfenced.length - 1) === "}") return unfenced;
+  const first = unfenced.indexOf("{");
+  const last = unfenced.lastIndexOf("}");
+  if (first >= 0 && last > first) return unfenced.slice(first, last + 1);
+  return "";
+}
+
+function parseWritingFeedbackText(text) {
+  const jsonText = extractJsonObjectFromText(text);
+  if (jsonText) {
+    try {
+      return JSON.parse(jsonText);
+    } catch (e) {
+      // JSON抽出できても壊れている場合は下の安全フォールバックに回す
+    }
+  }
+  const fallback = String(text || '').trim();
+  return {
+    evaluation: "C",
+    overall: fallback ? fallback.slice(0, 220) : "フィードバックの形式を整えられませんでした。先生に確認してください。",
+    good: "",
+    improve: "",
+    next: "",
+    factCheck: "",
+    misconception: "",
+    variationNote: ""
+  };
+}
+
 function callOpenAiWritingFeedback(model, prompt) {
   const apiKey = PropertiesService.getScriptProperties().getProperty("OPENAI_API_KEY");
   if (!apiKey) return { ok: false, status: "no_api_key", error: "OPENAI_API_KEYが未設定です" };
@@ -1766,12 +1805,7 @@ function callOpenAiWritingFeedback(model, prompt) {
     return { ok: false, status: "api_error", error: (data.error && data.error.message) || body || ("HTTP " + code) };
   }
   const text = parseOpenAiText(data);
-  let parsed = {};
-  try {
-    parsed = JSON.parse(String(text || '').replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```$/i, '').trim());
-  } catch (e) {
-    parsed = { evaluation: "C", overall: "フィードバックの形式を整えられませんでした。先生に確認してください。", good: "", improve: "", next: "", factCheck: "", misconception: "", variationNote: "" };
-  }
+  const parsed = parseWritingFeedbackText(text);
   const usage = data.usage || {};
   return {
     ok: true,
