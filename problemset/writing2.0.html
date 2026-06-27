@@ -108,6 +108,10 @@
     .feedback-copy { font-size: calc(1.02rem * var(--writing-text-scale)); line-height: 1.78; }
     .problem-card-text { font-size: calc(0.95rem * var(--writing-text-scale)); }
     .example-copy { font-size: calc(1rem * var(--writing-text-scale)); line-height: 1.85; }
+    .criterion-mark { width: 2.25rem; height: 2.25rem; display: grid; place-items: center; border-radius: 999px; font-weight: 900; }
+    .criterion-ok { background: rgba(16, 185, 129, 0.16); color: #a7f3d0; border: 1px solid rgba(16, 185, 129, 0.34); }
+    .criterion-mid { background: rgba(251, 191, 36, 0.16); color: #fde68a; border: 1px solid rgba(251, 191, 36, 0.34); }
+    .criterion-ng { background: rgba(244, 63, 94, 0.14); color: #fecdd3; border: 1px solid rgba(244, 63, 94, 0.32); }
     .font-size-control button { color: rgba(248, 250, 252, 0.68); background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.12); }
     .font-size-control button.active { color: #020617; background: var(--accent); border-color: rgba(255, 255, 255, 0.55); }
     details > summary { list-style: none; }
@@ -224,6 +228,10 @@
           <div class="rounded-2xl bg-emerald-400/10 border border-emerald-300/20 p-4"><div class="text-emerald-200 font-black text-xs mb-2">良い点</div><p id="good" class="feedback-copy"></p></div>
           <div class="rounded-2xl bg-amber-400/10 border border-amber-300/20 p-4"><div class="text-amber-200 font-black text-xs mb-2">直すと良い点</div><p id="improve" class="feedback-copy"></p></div>
           <div class="rounded-2xl bg-cyan-400/10 border border-cyan-300/20 p-4"><div class="text-cyan-200 font-black text-xs mb-2">書くときのポイント</div><p id="next" class="feedback-copy"></p></div>
+        </div>
+        <div id="criteria-box" class="hidden mt-4 rounded-2xl bg-white/5 border border-white/10 p-4">
+          <div class="text-slate-200 font-black text-xs mb-3">理解の整理</div>
+          <div id="criteria-list" class="space-y-2"></div>
         </div>
         <div id="key-point-box" class="hidden mt-4 rounded-2xl bg-rose-400/10 border border-rose-300/25 p-4">
           <div class="text-rose-200 font-black text-xs mb-2">重要ポイント</div>
@@ -517,6 +525,7 @@
       el("good").textContent = feedback.good || "--";
       el("improve").textContent = feedback.improve || "--";
       el("next").textContent = feedback.next || "--";
+      renderCriteria(feedback.criteria || []);
       el("key-point").textContent = feedback.keyPoint || "";
       el("key-point-box").classList.toggle("hidden", !feedback.keyPoint);
       const hasExamples = !!(feedback.revisedAnswer || feedback.modelAnswer);
@@ -536,6 +545,26 @@
         .slice(0, 3);
       el("remember-box").classList.toggle("hidden", rememberItems.length === 0);
       el("remember-list").innerHTML = rememberItems.map((item) => `<span class="rounded-full bg-white/10 border border-white/10 px-3 py-2 text-xs font-bold text-slate-100">${escapeHtml(item)}</span>`).join("");
+    }
+
+    function criterionClass(status) {
+      if (status === "○") return "criterion-ok";
+      if (status === "△") return "criterion-mid";
+      return "criterion-ng";
+    }
+
+    function renderCriteria(criteria) {
+      const list = Array.isArray(criteria) ? criteria.filter((item) => item && item.label && item.status && item.comment).slice(0, 5) : [];
+      el("criteria-box").classList.toggle("hidden", list.length === 0);
+      el("criteria-list").innerHTML = list.map((item) => `
+        <div class="flex gap-3 rounded-2xl border border-white/10 bg-slate-950/35 p-3">
+          <div class="criterion-mark ${criterionClass(item.status)}">${escapeHtml(item.status)}</div>
+          <div class="min-w-0">
+            <div class="text-xs font-black text-slate-100">${escapeHtml(item.label)}</div>
+            <div class="mt-1 text-sm leading-relaxed text-slate-300">${escapeHtml(item.comment)}</div>
+          </div>
+        </div>
+      `).join("");
     }
 
     function renderPeerExamples(examples) {

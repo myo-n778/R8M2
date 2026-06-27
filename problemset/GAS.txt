@@ -1576,7 +1576,7 @@ function getWritingProblemHeaders() {
 }
 
 function getWritingLogHeaders() {
-  return ["日時", "ユーザーID", "ユーザー名", "クラス", "番号", "problemId", "単元", "学年", "回答", "評価", "AIコメント", "良い点", "直すと良い点", "次に意識すること", "事実確認", "事実誤認", "複数説補足", "重要ポイント", "今回覚えること", "添削後の解答例", "別の書き方", "model", "status", "requestTokens", "responseTokens", "評価レベル", "parseStatus"];
+  return ["日時", "ユーザーID", "ユーザー名", "クラス", "番号", "problemId", "単元", "学年", "回答", "評価", "AIコメント", "良い点", "直すと良い点", "次に意識すること", "事実確認", "事実誤認", "複数説補足", "理解の整理", "重要ポイント", "今回覚えること", "添削後の解答例", "別の書き方", "model", "status", "requestTokens", "responseTokens", "評価レベル", "parseStatus"];
 }
 
 function ensureSheetWithHeaders(ss, sheetName, headers) {
@@ -1834,6 +1834,9 @@ function buildWritingPrompt(problem, answer, feedbackLevel) {
     "複数の見方や条件差がある場合は、断定しすぎず補足してください。",
     "コメントは短くしてください。各項目は原則一文です。",
     "直すと良い点は原則1つに絞ります。ただし理科として重要な誤りが複数ある場合は、improveとfactCheckまたはmisconceptionに分けて必ず示してください。",
+    "criteriaは評価理由の可視化です。原因 / 現象 / 結果 / 理由 / 用語 / 条件 / 比較 / 関係 / 過程 / 根拠 の中から、この問題と答案に必要な観点だけを最大5個選んでください。",
+    "criteriaのstatusは必ず ○ / △ / × のいずれかにしてください。○は書けている、△はあと少し、×は答案から読み取れない・誤りがある、という意味です。",
+    "criteriaのcommentは短く、答案のどこがよいか、何を足すとよいかが分かる一文にしてください。",
     "keyPointは理科の補足の結論を先に示す欄です。最重要の事実を一文で、強く短く書いてください。",
     "rememberは今回覚えることを1〜3項目で書いてください。各項目は短く、区切りは「 / 」にしてください。",
     "revisedAnswerは、生徒回答の考え方や言葉をできるだけ残し、科学的に正しく読みやすく整えた解答例にしてください。丸暗記用の完成答案に寄せすぎないでください。",
@@ -1844,7 +1847,7 @@ function buildWritingPrompt(problem, answer, feedbackLevel) {
     "JSONは必ず { で始め、} で終えてください。途中で文章を切らないでください。",
     "",
     "出力JSON形式:",
-    '{"evaluation":"S|A|B|C","overall":"90字以内・ですます調","good":"90字以内・ですます調","improve":"90字以内・ですます調","next":"90字以内・ですます調","factCheck":"90字以内・必要時のみ・ですます調","misconception":"90字以内・必要時のみ・ですます調","variationNote":"90字以内・必要時のみ・ですます調","keyPoint":"70字以内・理科の補足の結論・ですます調","remember":"1〜3項目・ / 区切り・ですます調","revisedAnswer":"160字以内・生徒回答を整えた一例・ですます調","modelAnswer":"160字以内・別の書き方の一例・ですます調"}',
+    '{"evaluation":"S|A|B|C","overall":"90字以内・ですます調","good":"90字以内・ですます調","improve":"90字以内・ですます調","next":"90字以内・ですます調","factCheck":"90字以内・必要時のみ・ですます調","misconception":"90字以内・必要時のみ・ですます調","variationNote":"90字以内・必要時のみ・ですます調","criteria":[{"label":"原因|現象|結果|理由|用語|条件|比較|関係|過程|根拠","status":"○|△|×","comment":"60字以内・ですます調"}],"keyPoint":"70字以内・理科の補足の結論・ですます調","remember":"1〜3項目・ / 区切り・ですます調","revisedAnswer":"160字以内・生徒回答を整えた一例・ですます調","modelAnswer":"160字以内・別の書き方の一例・ですます調"}',
     "",
     "選択された評価レベル: " + level,
     "学年: " + (problem.grade || "未指定"),
@@ -1975,6 +1978,21 @@ function parseWritingFeedbackText(text) {
   };
 }
 
+function normalizeWritingCriteria(criteria) {
+  const allowedLabels = ["原因", "現象", "結果", "理由", "用語", "条件", "比較", "関係", "過程", "根拠"];
+  const allowedStatus = ["○", "△", "×"];
+  if (!Array.isArray(criteria)) return [];
+  const seen = {};
+  return criteria.map(function(item) {
+    const label = String((item && item.label) || '').trim();
+    const status = String((item && item.status) || '').trim();
+    const comment = String((item && item.comment) || '').trim();
+    if (allowedLabels.indexOf(label) < 0 || allowedStatus.indexOf(status) < 0 || !comment || seen[label]) return null;
+    seen[label] = true;
+    return { label: label, status: status, comment: comment.slice(0, 90) };
+  }).filter(function(item) { return !!item; }).slice(0, 5);
+}
+
 function callOpenAiWritingFeedback(model, prompt) {
   const apiKey = PropertiesService.getScriptProperties().getProperty("OPENAI_API_KEY");
   if (!apiKey) return { ok: false, status: "no_api_key", error: "OPENAI_API_KEYが未設定です" };
@@ -1983,7 +2001,7 @@ function callOpenAiWritingFeedback(model, prompt) {
     contentType: "application/json",
     headers: { Authorization: "Bearer " + apiKey },
     muteHttpExceptions: true,
-    payload: JSON.stringify({ model: model, input: prompt, max_output_tokens: 1900 })
+    payload: JSON.stringify({ model: model, input: prompt, max_output_tokens: 2200 })
   });
   const code = response.getResponseCode();
   const body = response.getContentText();
@@ -2011,6 +2029,7 @@ function callOpenAiWritingFeedback(model, prompt) {
       factCheck: String(parsed.factCheck || '').trim(),
       misconception: String(parsed.misconception || '').trim(),
       variationNote: String(parsed.variationNote || '').trim(),
+      criteria: normalizeWritingCriteria(parsed.criteria),
       keyPoint: String(parsed.keyPoint || '').trim(),
       remember: String(parsed.remember || '').trim(),
       revisedAnswer: String(parsed.revisedAnswer || '').trim(),
@@ -2112,6 +2131,7 @@ function handleGradeWriting(p) {
       "problemId": problemId, "単元": problem.unit, "学年": problem.grade, "回答": answer, "評価": result.evaluation,
       "AIコメント": result.overall, "良い点": result.good, "直すと良い点": result.improve, "次に意識すること": result.next,
       "事実確認": result.factCheck, "事実誤認": result.misconception, "複数説補足": result.variationNote,
+      "理解の整理": JSON.stringify(result.criteria || []),
       "重要ポイント": result.keyPoint, "今回覚えること": result.remember,
       "添削後の解答例": result.revisedAnswer, "別の書き方": result.modelAnswer,
       "model": model, "status": "ok", "requestTokens": feedback.requestTokens, "responseTokens": feedback.responseTokens,
