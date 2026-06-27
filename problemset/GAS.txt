@@ -1572,7 +1572,7 @@ function recalculateUserHistoryDerivedColumns(ss, userId) {
 }
 
 function getWritingProblemHeaders() {
-  return ["problemId", "単元", "学年", "問題文", "模範要素", "評価観点", "よくある誤答", "複数説・補足", "上限文字数", "有効", "表示順"];
+  return ["problemId", "単元", "学年", "問題文", "模範要素", "評価観点", "criteria設定", "模範解答", "よくある誤答", "複数説・補足", "上限文字数", "有効", "表示順"];
 }
 
 function getWritingLogHeaders() {
@@ -1671,6 +1671,8 @@ function readWritingProblems(ss, runtimeConfig) {
       prompt: prompt,
       expectedAnswer: getFirstColumnValue(row, map, ["模範要素", "expectedAnswer"], ""),
       rubric: getFirstColumnValue(row, map, ["評価観点", "rubric"], ""),
+      criteriaSetting: getFirstColumnValue(row, map, ["criteria設定", "criteriaSetting", "criteria"], ""),
+      modelAnswerPreset: getFirstColumnValue(row, map, ["模範解答", "modelAnswer", "modelAnswerPreset"], ""),
       commonMisconceptions: getFirstColumnValue(row, map, ["よくある誤答", "commonMisconceptions"], ""),
       acceptedVariations: getFirstColumnValue(row, map, ["複数説・補足", "acceptedVariations"], ""),
       maxChars: maxChars,
@@ -1835,13 +1837,14 @@ function buildWritingPrompt(problem, answer, feedbackLevel) {
     "コメントは短くしてください。各項目は原則一文です。",
     "直すと良い点は原則1つに絞ります。ただし理科として重要な誤りが複数ある場合は、improveとscienceNoteに分けて必ず示してください。",
     "criteriaは評価理由の可視化です。原因 / 現象 / 結果 / 理由 / 用語 / 条件 / 比較 / 関係 / 過程 / 根拠 の中から、この問題と答案に必要な観点だけを最大5個選んでください。",
+    "問題にcriteria設定がある場合は、その観点を最優先してください。criteria設定にない観点は、必要な場合だけ追加してください。",
     "criteriaのstatusは必ず ○ / △ / × のいずれかにしてください。○は書けている、△はあと少し、×は答案から読み取れない・誤りがある、という意味です。",
     "criteriaのcommentは短く、答案のどこがよいか、何を足すとよいかが分かる一文にしてください。",
     "scienceNoteは、事実確認・事実誤認・複数説補足を必要な場合だけまとめる欄です。空欄でもかまいません。",
     "keyPointは理科の補足の結論を先に示す欄です。最重要の事実を一文で、強く短く書いてください。",
     "rememberは今回覚えることを1〜3項目で書いてください。各項目は短く、区切りは「 / 」にしてください。",
     "revisedAnswerは、生徒回答の考え方や言葉をできるだけ残し、科学的に正しく読みやすく整えた解答例にしてください。丸暗記用の完成答案に寄せすぎないでください。",
-    "modelAnswerは、同じ内容を別の書き方で示す短い一例にしてください。授業でそのまま暗記させる模範解答ではなく、表現の参考として扱える自然な文にしてください。",
+    "modelAnswerは、問題に模範解答がない場合だけ、同じ内容を別の書き方で示す短い一例にしてください。問題に模範解答がある場合は空文字にしてください。",
     "revisedAnswerとmodelAnswerは、問題の学年に合う範囲で正確にしてください。事実誤認を含めないでください。",
     "出力は必ずJSONオブジェクトだけにしてください。Markdown、コードブロック、前置き、説明文は出力しないでください。",
     "全てのキーを必ず含め、値は文字列にしてください。",
@@ -1856,6 +1859,8 @@ function buildWritingPrompt(problem, answer, feedbackLevel) {
     "問題: " + problem.prompt,
     "模範要素: " + (problem.expectedAnswer || "未設定"),
     "評価観点: " + (problem.rubric || "未設定"),
+    "criteria設定: " + (problem.criteriaSetting || "未設定"),
+    "表示用の模範解答: " + (problem.modelAnswerPreset || "未設定"),
     "よくある誤答: " + (problem.commonMisconceptions || "未設定"),
     "複数説・補足: " + (problem.acceptedVariations || "未設定"),
     "生徒回答: " + answer
@@ -2119,6 +2124,7 @@ function handleGradeWriting(p) {
       return returnJson({ error: "フィードバックを作成できませんでした: " + (feedback.error || "API error"), status: feedback.status || "api_error" });
     }
     const result = feedback.result;
+    if (problem.modelAnswerPreset) result.modelAnswer = problem.modelAnswerPreset;
     appendWritingLog(sheets.logSheet, {
       "日時": new Date(), "ユーザーID": userId, "ユーザー名": userName, "クラス": userClass, "番号": userNumber,
       "problemId": problemId, "単元": problem.unit, "学年": problem.grade, "回答": answer, "評価": result.evaluation,
