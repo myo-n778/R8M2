@@ -224,12 +224,13 @@
     function renderProblems() {
       const list = el("problem-list");
       list.innerHTML = "";
-      el("task-count").textContent = `${writingProblems.length} tasks`;
-      if (!writingProblems.length) {
+      const problems = Array.isArray(writingProblems) ? writingProblems : [];
+      el("task-count").textContent = `${problems.length} tasks`;
+      if (!problems.length) {
         list.innerHTML = `<div class="text-sm text-slate-400 rounded-2xl border border-slate-800 bg-slate-950/40 p-4">表示できる記述問題がありません。</div>`;
         return;
       }
-      writingProblems.forEach((problem) => {
+      problems.forEach((problem) => {
         const button = document.createElement("button");
         button.className = "problem-card rounded-2xl p-4 text-left w-full";
         button.dataset.problemId = problem.problemId;
@@ -272,8 +273,11 @@
         const params = { action: "syncWriting", id: SPREADSHEET_ID };
         if (isProfileReady()) params.userId = userId();
         const data = await fetchJson(params);
-        writingProblems = data.problems || [];
-        writingConfig = data.config || writingConfig;
+        if (!Array.isArray(data.problems)) {
+          throw new Error("GASが記述問題用の syncWriting に対応していない可能性があります。Apps Scriptに最新のGAS.txtを貼り替えて再デプロイしてください。");
+        }
+        writingProblems = data.problems;
+        writingConfig = { ...writingConfig, ...(data.config || {}) };
         usage = data.usage || {};
         renderLimits();
         renderProblems();
