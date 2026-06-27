@@ -535,8 +535,7 @@
       el("answer-examples").classList.add("hidden");
       el("toggle-examples-btn").innerHTML = `<i class="fa-solid fa-eye"></i> 解答例を見る`;
       const notes = [];
-      const scienceNotes = [feedback.factCheck, feedback.misconception, feedback.variationNote].filter(Boolean);
-      if (scienceNotes.length) notes.push(`<div><b class="text-cyan-200">理科の補足:</b> ${scienceNotes.map(escapeHtml).join(" ")}</div>`);
+      if (feedback.scienceNote) notes.push(`<div><b class="text-cyan-200">理科の補足:</b> ${escapeHtml(feedback.scienceNote)}</div>`);
       el("extra-notes").innerHTML = notes.join("");
       const rememberItems = String(feedback.remember || "")
         .split(/[\/／\n]/)
