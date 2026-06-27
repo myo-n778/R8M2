@@ -308,7 +308,7 @@
         const button = document.createElement("button");
         button.className = "problem-card rounded-2xl p-4 text-left w-full";
         button.dataset.problemId = problem.problemId;
-        const bestText = problem.bestEvaluation ? `Best ${escapeHtml(problem.bestEvaluation)}${problem.bestEvaluationDate ? ` / ${escapeHtml(problem.bestEvaluationDate)}` : ""}` : "未挑戦";
+        const bestText = problem.bestEvaluation ? `${escapeHtml(problem.bestEvaluation)}${problem.bestEvaluationDate ? ` / ${escapeHtml(problem.bestEvaluationDate)}` : ""}` : "未挑戦";
         button.innerHTML = `
           <div class="flex justify-between gap-3 mb-2">
             <span class="text-[10px] text-cyan-200 font-black">${problem.unit || "単元未設定"}</span>
