@@ -1761,6 +1761,40 @@ function extractJsonObjectFromText(text) {
   return "";
 }
 
+function extractJsonStringField(text, key) {
+  const source = String(text || '');
+  const pattern = new RegExp('"' + key + '"\\s*:\\s*"([\\s\\S]*?)(?:"\\s*,\\s*"(?:evaluation|overall|good|improve|next|factCheck|misconception|variationNote)"\\s*:|"\\s*\\}|$)', 'i');
+  const match = source.match(pattern);
+  if (!match) return "";
+  return String(match[1] || '')
+    .replace(/\\"/g, '"')
+    .replace(/\\n/g, '\n')
+    .replace(/\\\\/g, '\\')
+    .trim();
+}
+
+function parseWritingFeedbackFields(text) {
+  const evaluation = extractJsonStringField(text, "evaluation");
+  const overall = extractJsonStringField(text, "overall");
+  const good = extractJsonStringField(text, "good");
+  const improve = extractJsonStringField(text, "improve");
+  const next = extractJsonStringField(text, "next");
+  const factCheck = extractJsonStringField(text, "factCheck");
+  const misconception = extractJsonStringField(text, "misconception");
+  const variationNote = extractJsonStringField(text, "variationNote");
+  if (!evaluation && !overall && !good && !improve && !next && !factCheck) return null;
+  return {
+    evaluation: evaluation || "C",
+    overall: overall,
+    good: good,
+    improve: improve,
+    next: next,
+    factCheck: factCheck,
+    misconception: misconception,
+    variationNote: variationNote
+  };
+}
+
 function parseWritingFeedbackText(text) {
   const jsonText = extractJsonObjectFromText(text);
   if (jsonText) {
@@ -1770,6 +1804,8 @@ function parseWritingFeedbackText(text) {
       // JSON抽出できても壊れている場合は下の安全フォールバックに回す
     }
   }
+  const fields = parseWritingFeedbackFields(text);
+  if (fields) return fields;
   const fallback = String(text || '').trim();
   return {
     evaluation: "C",
@@ -1791,7 +1827,7 @@ function callOpenAiWritingFeedback(model, prompt) {
     contentType: "application/json",
     headers: { Authorization: "Bearer " + apiKey },
     muteHttpExceptions: true,
-    payload: JSON.stringify({ model: model, input: prompt, max_output_tokens: 500 })
+    payload: JSON.stringify({ model: model, input: prompt, max_output_tokens: 900 })
   });
   const code = response.getResponseCode();
   const body = response.getContentText();
