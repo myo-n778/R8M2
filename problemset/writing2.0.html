@@ -202,8 +202,12 @@
             <button id="feedback-btn" class="bg-lime-400 hover:bg-lime-300 text-slate-950 rounded-2xl px-5 py-4 text-sm font-black uppercase flex-1">
               <i class="fa-solid fa-comments"></i> フィードバックを見る
             </button>
+            <button id="voice-input-btn" type="button" class="bg-cyan-400/10 hover:bg-cyan-400/15 border border-cyan-300/25 text-cyan-100 rounded-2xl px-5 py-4 text-sm font-black uppercase">
+              <i class="fa-solid fa-microphone"></i> 音声入力
+            </button>
             <button id="clear-btn" class="bg-white/10 hover:bg-white/15 border border-white/10 text-slate-200 rounded-2xl px-5 py-4 text-sm font-black uppercase">Clear</button>
           </div>
+          <p id="voice-status" class="hidden text-xs text-slate-400 leading-relaxed"></p>
 
           <div id="peer-example-panel" class="hidden rounded-[1.4rem] border border-white/10 bg-slate-950/35 p-4">
             <button id="toggle-peer-examples-btn" type="button" class="w-full rounded-2xl border border-cyan-300/25 bg-cyan-400/10 hover:bg-cyan-400/15 px-4 py-3 text-sm font-black text-cyan-100 transition-all">
@@ -283,6 +287,8 @@
     let selectedProblem = null;
     let writingConfig = { writingAiEnabled: false, writingMaxChars: 300, writingModel: "gpt-5.4-nano" };
     let usage = {};
+    let speechRecognition = null;
+    let isVoiceInputActive = false;
     const FEEDBACK_LEVELS = ["中学生", "高校生", "先生"];
     const THEME_SEQUENCE = ["modeA", "modeB", "modeC", "modeE", "modeF", "modeG", "t16", "t31"];
     const THEMES = {
@@ -394,6 +400,87 @@
         btn.classList.toggle("active", btn.dataset.fontSize === normalized);
       });
       localStorage.setItem(FONT_SIZE_STORAGE_KEY, normalized);
+    }
+
+    function speechRecognitionCtor() {
+      return window.SpeechRecognition || window.webkitSpeechRecognition || null;
+    }
+
+    function setVoiceStatus(text, type = "info") {
+      const status = el("voice-status");
+      status.classList.remove("hidden", "text-slate-400", "text-cyan-200", "text-rose-200", "text-lime-200");
+      status.classList.add(type === "error" ? "text-rose-200" : type === "ok" ? "text-lime-200" : type === "active" ? "text-cyan-200" : "text-slate-400");
+      status.textContent = text;
+    }
+
+    function setVoiceButtonActive(active) {
+      const button = el("voice-input-btn");
+      isVoiceInputActive = active;
+      button.classList.toggle("bg-cyan-400/25", active);
+      button.innerHTML = active
+        ? `<i class="fa-solid fa-microphone-lines"></i> 停止`
+        : `<i class="fa-solid fa-microphone"></i> 音声入力`;
+    }
+
+    function appendRecognizedText(text) {
+      const answer = el("answer");
+      const current = answer.value.trimEnd();
+      const separator = current && !/[。！？\n]$/.test(current) ? "。" : "";
+      answer.value = current ? `${current}${separator}${text}` : text;
+      answer.focus();
+      updateCharCount();
+    }
+
+    function initVoiceInput() {
+      const Ctor = speechRecognitionCtor();
+      const button = el("voice-input-btn");
+      if (!Ctor) {
+        button.disabled = true;
+        button.classList.add("opacity-50", "cursor-not-allowed");
+        setVoiceStatus("このブラウザでは音声入力に対応していません。Safari/iOSではキーボードの音声入力を使ってください。", "error");
+        return;
+      }
+      speechRecognition = new Ctor();
+      speechRecognition.lang = "ja-JP";
+      speechRecognition.interimResults = false;
+      speechRecognition.continuous = false;
+      speechRecognition.onstart = () => {
+        setVoiceButtonActive(true);
+        setVoiceStatus("話してください。認識した文字を回答欄に追加します。", "active");
+      };
+      speechRecognition.onresult = (event) => {
+        const transcript = Array.from(event.results || [])
+          .map((result) => result[0] && result[0].transcript ? result[0].transcript.trim() : "")
+          .filter(Boolean)
+          .join("");
+        if (transcript) {
+          appendRecognizedText(transcript);
+          setVoiceStatus("音声入力を回答欄に追加しました。送信前に内容を確認してください。", "ok");
+        }
+      };
+      speechRecognition.onerror = (event) => {
+        const message = event.error === "not-allowed"
+          ? "マイクの使用が許可されていません。ブラウザのマイク許可を確認してください。"
+          : "音声入力に失敗しました。もう一度試すか、キーボード入力を使ってください。";
+        setVoiceStatus(message, "error");
+      };
+      speechRecognition.onend = () => setVoiceButtonActive(false);
+    }
+
+    function toggleVoiceInput() {
+      if (!speechRecognition) {
+        setVoiceStatus("このブラウザでは音声入力に対応していません。Safari/iOSではキーボードの音声入力を使ってください。", "error");
+        return;
+      }
+      if (isVoiceInputActive) {
+        speechRecognition.stop();
+        return;
+      }
+      try {
+        speechRecognition.start();
+      } catch (err) {
+        setVoiceStatus("音声入力を開始できませんでした。少し待ってからもう一度試してください。", "error");
+      }
     }
 
     async function fetchJson(params) {
@@ -593,6 +680,7 @@
     el("sync-btn").addEventListener("click", syncWriting);
     el("theme-btn").addEventListener("click", cycleTheme);
     el("feedback-btn").addEventListener("click", requestFeedback);
+    el("voice-input-btn").addEventListener("click", toggleVoiceInput);
     el("toggle-examples-btn").addEventListener("click", () => {
       const examples = el("answer-examples");
       const willShow = examples.classList.contains("hidden");
@@ -629,6 +717,7 @@
       next: "--"
     });
     loadProfile();
+    initVoiceInput();
     applyFontSizeMode(localStorage.getItem(FONT_SIZE_STORAGE_KEY) || "standard");
     applyTheme(localStorage.getItem("ethics_theme_mode") || "modeA");
     syncWriting();
