@@ -107,6 +107,7 @@
     .writing-prompt { font-size: calc(1.55rem * var(--writing-text-scale)); }
     .feedback-copy { font-size: calc(1.02rem * var(--writing-text-scale)); line-height: 1.78; }
     .problem-card-text { font-size: calc(0.95rem * var(--writing-text-scale)); }
+    .example-copy { font-size: calc(1rem * var(--writing-text-scale)); line-height: 1.85; }
     .font-size-control button { color: rgba(248, 250, 252, 0.68); background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.12); }
     .font-size-control button.active { color: #020617; background: var(--accent); border-color: rgba(255, 255, 255, 0.55); }
     details > summary { list-style: none; }
@@ -215,6 +216,22 @@
           <div class="rounded-2xl bg-emerald-400/10 border border-emerald-300/20 p-4"><div class="text-emerald-200 font-black text-xs mb-2">良い点</div><p id="good" class="feedback-copy"></p></div>
           <div class="rounded-2xl bg-amber-400/10 border border-amber-300/20 p-4"><div class="text-amber-200 font-black text-xs mb-2">直すと良い点</div><p id="improve" class="feedback-copy"></p></div>
           <div class="rounded-2xl bg-cyan-400/10 border border-cyan-300/20 p-4"><div class="text-cyan-200 font-black text-xs mb-2">書くときのポイント</div><p id="next" class="feedback-copy"></p></div>
+        </div>
+        <div id="example-controls" class="hidden mt-4">
+          <button id="toggle-examples-btn" type="button" class="w-full rounded-2xl border border-white/10 bg-white/10 hover:bg-white/15 px-4 py-3 text-sm font-black text-slate-100 transition-all">
+            <i class="fa-solid fa-eye"></i> 解答例を見る
+          </button>
+          <p class="mt-2 text-xs text-slate-400 leading-relaxed">丸暗記用ではなく、書き方を整えるための一例です。</p>
+        </div>
+        <div id="answer-examples" class="hidden mt-4 space-y-3">
+          <div class="rounded-2xl bg-lime-400/10 border border-lime-300/20 p-4">
+            <div class="text-lime-200 font-black text-xs mb-2">添削後の解答例</div>
+            <p id="revised-answer" class="example-copy"></p>
+          </div>
+          <div class="rounded-2xl bg-violet-400/10 border border-violet-300/20 p-4">
+            <div class="text-violet-200 font-black text-xs mb-2">模範解答（別の書き方）</div>
+            <p id="model-answer" class="example-copy"></p>
+          </div>
         </div>
         <div id="extra-notes" class="mt-3 text-sm text-slate-300 space-y-2 leading-relaxed"></div>
       </section>
@@ -482,6 +499,12 @@
       el("good").textContent = feedback.good || "--";
       el("improve").textContent = feedback.improve || "--";
       el("next").textContent = feedback.next || "--";
+      const hasExamples = !!(feedback.revisedAnswer || feedback.modelAnswer);
+      el("revised-answer").textContent = feedback.revisedAnswer || "--";
+      el("model-answer").textContent = feedback.modelAnswer || "--";
+      el("example-controls").classList.toggle("hidden", !hasExamples);
+      el("answer-examples").classList.add("hidden");
+      el("toggle-examples-btn").innerHTML = `<i class="fa-solid fa-eye"></i> 解答例を見る`;
       const notes = [];
       const scienceNotes = [feedback.factCheck, feedback.misconception, feedback.variationNote].filter(Boolean);
       if (scienceNotes.length) notes.push(`<div><b class="text-cyan-200">理科の補足:</b> ${scienceNotes.map(escapeHtml).join(" ")}</div>`);
@@ -497,6 +520,14 @@
     el("sync-btn").addEventListener("click", syncWriting);
     el("theme-btn").addEventListener("click", cycleTheme);
     el("feedback-btn").addEventListener("click", requestFeedback);
+    el("toggle-examples-btn").addEventListener("click", () => {
+      const examples = el("answer-examples");
+      const willShow = examples.classList.contains("hidden");
+      examples.classList.toggle("hidden", !willShow);
+      el("toggle-examples-btn").innerHTML = willShow
+        ? `<i class="fa-solid fa-eye-slash"></i> 解答例を隠す`
+        : `<i class="fa-solid fa-eye"></i> 解答例を見る`;
+    });
     el("feedback-level").addEventListener("change", () => localStorage.setItem("writing_feedback_level", feedbackLevel()));
     el("clear-btn").addEventListener("click", () => {
       el("answer").value = "";

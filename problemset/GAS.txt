@@ -1576,7 +1576,7 @@ function getWritingProblemHeaders() {
 }
 
 function getWritingLogHeaders() {
-  return ["日時", "ユーザーID", "ユーザー名", "クラス", "番号", "problemId", "単元", "学年", "回答", "評価", "AIコメント", "良い点", "直すと良い点", "次に意識すること", "事実確認", "事実誤認", "複数説補足", "model", "status", "requestTokens", "responseTokens", "評価レベル", "parseStatus"];
+  return ["日時", "ユーザーID", "ユーザー名", "クラス", "番号", "problemId", "単元", "学年", "回答", "評価", "AIコメント", "良い点", "直すと良い点", "次に意識すること", "事実確認", "事実誤認", "複数説補足", "添削後の解答例", "別の書き方", "model", "status", "requestTokens", "responseTokens", "評価レベル", "parseStatus"];
 }
 
 function ensureSheetWithHeaders(ss, sheetName, headers) {
@@ -1786,12 +1786,15 @@ function buildWritingPrompt(problem, answer, feedbackLevel) {
     "複数の見方や条件差がある場合は、断定しすぎず補足してください。",
     "コメントは短くしてください。各項目は原則一文です。",
     "直すと良い点は原則1つに絞ります。ただし理科として重要な誤りが複数ある場合は、improveとfactCheckまたはmisconceptionに分けて必ず示してください。",
+    "revisedAnswerは、生徒回答の考え方や言葉をできるだけ残し、科学的に正しく読みやすく整えた解答例にしてください。丸暗記用の完成答案に寄せすぎないでください。",
+    "modelAnswerは、同じ内容を別の書き方で示す短い一例にしてください。授業でそのまま暗記させる模範解答ではなく、表現の参考として扱える自然な文にしてください。",
+    "revisedAnswerとmodelAnswerは、問題の学年に合う範囲で正確にしてください。事実誤認を含めないでください。",
     "出力は必ずJSONオブジェクトだけにしてください。Markdown、コードブロック、前置き、説明文は出力しないでください。",
     "全てのキーを必ず含め、値は文字列にしてください。",
     "JSONは必ず { で始め、} で終えてください。途中で文章を切らないでください。",
     "",
     "出力JSON形式:",
-    '{"evaluation":"S|A|B|C","overall":"90字以内・ですます調","good":"90字以内・ですます調","improve":"90字以内・ですます調","next":"90字以内・ですます調","factCheck":"90字以内・必要時のみ・ですます調","misconception":"90字以内・必要時のみ・ですます調","variationNote":"90字以内・必要時のみ・ですます調"}',
+    '{"evaluation":"S|A|B|C","overall":"90字以内・ですます調","good":"90字以内・ですます調","improve":"90字以内・ですます調","next":"90字以内・ですます調","factCheck":"90字以内・必要時のみ・ですます調","misconception":"90字以内・必要時のみ・ですます調","variationNote":"90字以内・必要時のみ・ですます調","revisedAnswer":"160字以内・生徒回答を整えた一例・ですます調","modelAnswer":"160字以内・別の書き方の一例・ですます調"}',
     "",
     "選択された評価レベル: " + level,
     "学年: " + (problem.grade || "未指定"),
@@ -1835,7 +1838,7 @@ function extractJsonObjectFromText(text) {
 
 function extractJsonStringField(text, key) {
   const source = String(text || '');
-  const pattern = new RegExp('"' + key + '"\\s*:\\s*"([\\s\\S]*?)(?:"\\s*,\\s*"(?:evaluation|overall|good|improve|next|factCheck|misconception|variationNote)"\\s*:|"\\s*\\}|$)', 'i');
+  const pattern = new RegExp('"' + key + '"\\s*:\\s*"([\\s\\S]*?)(?:"\\s*,\\s*"(?:evaluation|overall|good|improve|next|factCheck|misconception|variationNote|revisedAnswer|modelAnswer)"\\s*:|"\\s*\\}|$)', 'i');
   const match = source.match(pattern);
   if (!match) return "";
   return String(match[1] || '')
@@ -1867,6 +1870,8 @@ function parseWritingFeedbackFields(text) {
   const factCheck = extractJsonStringField(text, "factCheck");
   const misconception = extractJsonStringField(text, "misconception");
   const variationNote = extractJsonStringField(text, "variationNote");
+  const revisedAnswer = extractJsonStringField(text, "revisedAnswer");
+  const modelAnswer = extractJsonStringField(text, "modelAnswer");
   if (!evaluation && !overall && !good && !improve && !next && !factCheck) return null;
   return {
     evaluation: evaluation || "C",
@@ -1876,7 +1881,9 @@ function parseWritingFeedbackFields(text) {
     next: next,
     factCheck: factCheck,
     misconception: misconception,
-    variationNote: variationNote
+    variationNote: variationNote,
+    revisedAnswer: revisedAnswer,
+    modelAnswer: modelAnswer
   };
 }
 
@@ -1906,6 +1913,8 @@ function parseWritingFeedbackText(text) {
     factCheck: "",
     misconception: "",
     variationNote: "",
+    revisedAnswer: "",
+    modelAnswer: "",
     parseStatus: "fallback"
   };
 }
@@ -1918,7 +1927,7 @@ function callOpenAiWritingFeedback(model, prompt) {
     contentType: "application/json",
     headers: { Authorization: "Bearer " + apiKey },
     muteHttpExceptions: true,
-    payload: JSON.stringify({ model: model, input: prompt, max_output_tokens: 1400 })
+    payload: JSON.stringify({ model: model, input: prompt, max_output_tokens: 1900 })
   });
   const code = response.getResponseCode();
   const body = response.getContentText();
@@ -1946,6 +1955,8 @@ function callOpenAiWritingFeedback(model, prompt) {
       factCheck: String(parsed.factCheck || '').trim(),
       misconception: String(parsed.misconception || '').trim(),
       variationNote: String(parsed.variationNote || '').trim(),
+      revisedAnswer: String(parsed.revisedAnswer || '').trim(),
+      modelAnswer: String(parsed.modelAnswer || '').trim(),
       parseStatus: String(parsed.parseStatus || "fallback").trim()
     },
     requestTokens: usage.input_tokens || "",
@@ -2043,6 +2054,7 @@ function handleGradeWriting(p) {
       "problemId": problemId, "単元": problem.unit, "学年": problem.grade, "回答": answer, "評価": result.evaluation,
       "AIコメント": result.overall, "良い点": result.good, "直すと良い点": result.improve, "次に意識すること": result.next,
       "事実確認": result.factCheck, "事実誤認": result.misconception, "複数説補足": result.variationNote,
+      "添削後の解答例": result.revisedAnswer, "別の書き方": result.modelAnswer,
       "model": model, "status": "ok", "requestTokens": feedback.requestTokens, "responseTokens": feedback.responseTokens,
       "評価レベル": feedbackLevel, "parseStatus": result.parseStatus || "fallback"
     });
