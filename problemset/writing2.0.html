@@ -5,6 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>SCIENCE 2026 Writing Feedback</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=Orbitron:wght@700;900&display=swap" rel="stylesheet">
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
   <style>
     :root {
@@ -15,7 +18,13 @@
       --lime: #a3e635;
       --amber: #fbbf24;
       --rose: #fb7185;
+      --accent: #22d3ee;
+      --accent-soft: rgba(34, 211, 238, 0.12);
+      --accent-line: rgba(34, 211, 238, 0.34);
     }
+    body.theme-lime { --accent: #a3e635; --accent-soft: rgba(163, 230, 53, 0.12); --accent-line: rgba(163, 230, 53, 0.34); }
+    body.theme-amber { --accent: #fbbf24; --accent-soft: rgba(251, 191, 36, 0.12); --accent-line: rgba(251, 191, 36, 0.34); }
+    body.theme-rose { --accent: #fb7185; --accent-soft: rgba(251, 113, 133, 0.12); --accent-line: rgba(251, 113, 133, 0.34); }
     body {
       min-height: 100vh;
       background:
@@ -23,8 +32,9 @@
         radial-gradient(circle at 82% 6%, rgba(163, 230, 53, 0.13), transparent 26rem),
         linear-gradient(135deg, #08111f 0%, #111827 54%, #0f172a 100%);
       color: #e5f4ff;
-      font-family: "Avenir Next", "Hiragino Sans", "Yu Gothic", sans-serif;
+      font-family: "Noto Sans JP", "Hiragino Sans", "Yu Gothic", sans-serif;
     }
+    .font-tech { font-family: "Orbitron", "Noto Sans JP", sans-serif; }
     .glass {
       background: var(--panel);
       border: 1px solid var(--line);
@@ -32,8 +42,8 @@
       backdrop-filter: blur(18px);
     }
     .chip {
-      border: 1px solid rgba(34, 211, 238, 0.25);
-      background: rgba(34, 211, 238, 0.08);
+      border: 1px solid var(--accent-line);
+      background: var(--accent-soft);
       color: #a5f3fc;
     }
     .problem-card {
@@ -43,100 +53,103 @@
     }
     .problem-card:hover, .problem-card.active {
       transform: translateY(-2px);
-      border-color: rgba(34, 211, 238, 0.7);
+      border-color: var(--accent);
       background: rgba(8, 47, 73, 0.58);
     }
     textarea {
       resize: vertical;
-      min-height: 11rem;
+      min-height: 15rem;
     }
     .eval-badge {
-      width: 4.5rem;
-      height: 4.5rem;
-      border-radius: 1.5rem;
+      width: 3.6rem;
+      height: 3.6rem;
+      border-radius: 1.1rem;
       display: grid;
       place-items: center;
-      background: linear-gradient(135deg, rgba(34, 211, 238, 0.22), rgba(163, 230, 53, 0.18));
-      border: 1px solid rgba(34, 211, 238, 0.38);
+      background: linear-gradient(135deg, var(--accent-soft), rgba(163, 230, 53, 0.12));
+      border: 1px solid var(--accent-line);
       color: white;
-      font-size: 2.4rem;
+      font-size: 1.9rem;
       font-weight: 900;
     }
+    .input-compact {
+      background: rgba(2, 6, 23, 0.72);
+      border: 1px solid rgba(148, 163, 184, 0.24);
+      border-radius: 0.9rem;
+      outline: none;
+    }
+    .input-compact:focus { border-color: var(--accent); }
+    details > summary { list-style: none; }
+    details > summary::-webkit-details-marker { display: none; }
   </style>
 </head>
 <body>
-  <main class="max-w-6xl mx-auto px-4 py-6 md:py-10">
-    <header class="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-6">
+  <main class="max-w-[1500px] mx-auto px-4 py-4 md:py-6">
+    <header class="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4 mb-4">
       <div>
-        <div class="text-[10px] tracking-[0.36em] text-cyan-200/80 font-black uppercase">SCIENCE 2026</div>
-        <h1 class="text-3xl md:text-5xl font-black tracking-tight mt-2">Writing Feedback</h1>
-        <p class="text-slate-300 text-sm mt-3">記述問題の練習用フィードバックです。EXPやランキングには入りません。</p>
+        <div class="font-tech text-[10px] tracking-[0.42em] text-cyan-200/80 font-black uppercase">SCIENCE 2026</div>
+        <h1 class="text-3xl md:text-5xl font-black tracking-tight mt-1">Writing Feedback</h1>
+        <p class="text-slate-300 text-sm mt-2">記述問題の練習用フィードバックです。EXPやランキングには入りません。</p>
       </div>
-      <div class="flex gap-2">
+      <div class="flex flex-wrap items-center gap-2">
         <a href="./science2.0.html" class="chip rounded-full px-4 py-2 text-xs font-black uppercase"><i class="fa-solid fa-arrow-left"></i> Selection</a>
         <button id="sync-btn" class="chip rounded-full px-4 py-2 text-xs font-black uppercase"><i class="fa-solid fa-rotate"></i> Sync</button>
+        <button id="theme-btn" class="chip rounded-full px-4 py-2 text-xs font-black uppercase"><i class="fa-solid fa-palette"></i> Theme</button>
       </div>
     </header>
 
-    <section id="profile-panel" class="glass rounded-[2rem] p-5 mb-6">
-      <div class="grid md:grid-cols-[1fr_auto] gap-4 items-end">
-        <div>
-          <div class="text-xs text-slate-400 font-bold mb-2">USER</div>
-          <div class="grid grid-cols-3 gap-2">
-            <input id="user-class" class="bg-slate-950/70 border border-slate-700 rounded-xl px-3 py-3 text-sm outline-none focus:border-cyan-400" placeholder="クラス">
-            <input id="user-number" class="bg-slate-950/70 border border-slate-700 rounded-xl px-3 py-3 text-sm outline-none focus:border-cyan-400" placeholder="番号">
-            <input id="user-name" class="bg-slate-950/70 border border-slate-700 rounded-xl px-3 py-3 text-sm outline-none focus:border-cyan-400" placeholder="名前">
-          </div>
+    <section id="profile-panel" class="glass rounded-[1.4rem] p-3 mb-4">
+      <div class="grid lg:grid-cols-[auto_1fr_auto] gap-3 items-center">
+        <div class="font-tech text-[10px] text-slate-400 font-black tracking-[0.2em] uppercase">USER</div>
+        <div class="grid grid-cols-3 gap-2">
+          <input id="user-class" class="input-compact px-3 py-2 text-sm" placeholder="クラス">
+          <input id="user-number" class="input-compact px-3 py-2 text-sm" placeholder="番号">
+          <input id="user-name" class="input-compact px-3 py-2 text-sm" placeholder="名前">
         </div>
-        <button id="save-profile-btn" class="bg-cyan-500 hover:bg-cyan-400 text-slate-950 rounded-xl px-5 py-3 text-xs font-black uppercase">Save Profile</button>
+        <button id="save-profile-btn" class="bg-cyan-500 hover:bg-cyan-400 text-slate-950 rounded-xl px-4 py-2 text-xs font-black uppercase">Save</button>
       </div>
     </section>
 
-    <section class="grid lg:grid-cols-[0.9fr_1.1fr] gap-6">
-      <aside class="glass rounded-[2rem] p-5">
-        <div class="flex items-center justify-between mb-4">
-          <h2 class="text-sm font-black uppercase tracking-[0.18em] text-cyan-200">Writing Tasks</h2>
-          <span id="task-count" class="text-[10px] text-slate-400 font-bold">0 tasks</span>
-        </div>
-        <div id="limit-status" class="rounded-2xl bg-slate-950/50 border border-slate-800 p-3 text-xs text-slate-300 mb-4">同期してください。</div>
-        <div id="problem-list" class="space-y-3"></div>
-      </aside>
+    <section class="grid xl:grid-cols-[minmax(0,1fr)_460px] gap-4 items-start">
+      <section class="glass rounded-[1.8rem] p-4 md:p-5 min-h-[40rem]">
+        <div id="message" class="hidden rounded-2xl p-4 text-sm mb-4"></div>
 
-      <section class="glass rounded-[2rem] p-5 md:p-6 min-h-[36rem]">
-        <div id="empty-state" class="h-full min-h-[28rem] grid place-items-center text-center text-slate-400">
+        <div id="empty-state" class="h-full min-h-[32rem] grid place-items-center text-center text-slate-400">
           <div>
             <i class="fa-solid fa-pen-nib text-4xl text-cyan-300 mb-4"></i>
-            <p class="font-bold">左から記述問題を選んでください。</p>
+            <p class="font-bold">右側から記述問題を選んでください。</p>
             <p class="text-xs mt-2">問題が出ない場合は、スプレッドシートの `記述問題` シートを確認してください。</p>
           </div>
         </div>
 
         <div id="writing-area" class="hidden space-y-5">
-          <div>
+          <div class="rounded-[1.4rem] border border-slate-700/60 bg-slate-950/35 p-4">
             <div class="flex flex-wrap gap-2 mb-3">
               <span id="selected-unit" class="chip rounded-full px-3 py-1 text-[10px] font-black"></span>
               <span id="selected-grade" class="chip rounded-full px-3 py-1 text-[10px] font-black"></span>
               <span id="max-chars" class="chip rounded-full px-3 py-1 text-[10px] font-black"></span>
             </div>
-            <h2 id="prompt" class="text-xl md:text-2xl font-black leading-relaxed"></h2>
+            <h2 id="prompt" class="text-xl md:text-3xl font-black leading-relaxed"></h2>
           </div>
 
-          <div class="rounded-2xl bg-slate-950/45 border border-slate-800 p-4">
-            <label for="feedback-level" class="block text-xs font-black uppercase text-slate-300 mb-2">Feedback Level</label>
-            <select id="feedback-level" class="w-full bg-slate-950/70 border border-slate-700 rounded-xl px-3 py-3 text-sm outline-none focus:border-cyan-400">
-              <option value="中学生">中学生</option>
-              <option value="高校生">高校生</option>
-              <option value="先生">先生</option>
-            </select>
-            <p class="text-[11px] text-slate-400 mt-2">評価の厳しさとコメントの観点を切り替えます。初期設定は中学生です。</p>
-          </div>
-
-          <div>
-            <div class="flex justify-between items-center mb-2">
-              <label for="answer" class="text-xs font-black uppercase text-slate-300">Your Answer</label>
-              <span id="char-count" class="text-xs text-slate-400">0 / 300</span>
+          <div class="grid md:grid-cols-[1fr_220px] gap-3 items-end">
+            <div>
+              <div class="flex justify-between items-center mb-2">
+                <label for="answer" class="font-tech text-[10px] font-black uppercase text-slate-300 tracking-[0.18em]">Your Answer</label>
+                <span id="char-count" class="text-xs text-slate-400">0 / 300</span>
+              </div>
+              <textarea id="answer" class="w-full bg-slate-950/70 border border-slate-700 rounded-2xl p-4 text-base md:text-lg leading-relaxed outline-none focus:border-cyan-400" placeholder="ここに自分の考えを書きます。短くても送れます。"></textarea>
             </div>
-            <textarea id="answer" class="w-full bg-slate-950/70 border border-slate-700 rounded-2xl p-4 text-base leading-relaxed outline-none focus:border-cyan-400" placeholder="ここに自分の考えを書きます。短くても送れます。"></textarea>
+
+            <div class="rounded-2xl bg-slate-950/45 border border-slate-800 p-4">
+              <label for="feedback-level" class="block font-tech text-[10px] font-black uppercase text-slate-300 mb-2 tracking-[0.16em]">Level</label>
+              <select id="feedback-level" class="w-full bg-slate-950/70 border border-slate-700 rounded-xl px-3 py-3 text-sm outline-none focus:border-cyan-400">
+                <option value="中学生">中学生</option>
+                <option value="高校生">高校生</option>
+                <option value="先生">先生</option>
+              </select>
+              <p class="text-[11px] text-slate-400 mt-2 leading-relaxed">評価の厳しさと観点を切り替えます。</p>
+            </div>
           </div>
 
           <div class="flex flex-col sm:flex-row gap-3">
@@ -146,25 +159,41 @@
             <button id="clear-btn" class="bg-white/10 hover:bg-white/15 border border-white/10 text-slate-200 rounded-2xl px-5 py-4 text-sm font-black uppercase">Clear</button>
           </div>
 
-          <div id="message" class="hidden rounded-2xl p-4 text-sm"></div>
-
-          <section id="feedback-panel" class="hidden rounded-[1.5rem] border border-cyan-400/20 bg-slate-950/50 p-5">
-            <div class="flex gap-4 items-center mb-5">
-              <div id="evaluation" class="eval-badge">-</div>
-              <div>
-                <div class="text-[10px] tracking-[0.25em] text-cyan-200 font-black uppercase">AI Feedback</div>
-                <p id="overall" class="text-slate-100 font-bold mt-2"></p>
-              </div>
-            </div>
-            <div class="grid md:grid-cols-3 gap-3 text-sm">
-              <div class="rounded-2xl bg-emerald-400/10 border border-emerald-300/20 p-4"><div class="text-emerald-200 font-black text-xs mb-2">良い点</div><p id="good"></p></div>
-              <div class="rounded-2xl bg-amber-400/10 border border-amber-300/20 p-4"><div class="text-amber-200 font-black text-xs mb-2">直すと良い点</div><p id="improve"></p></div>
-              <div class="rounded-2xl bg-cyan-400/10 border border-cyan-300/20 p-4"><div class="text-cyan-200 font-black text-xs mb-2">書くときのポイント</div><p id="next"></p></div>
-            </div>
-            <div id="extra-notes" class="mt-3 text-xs text-slate-300 space-y-2"></div>
-          </section>
         </div>
       </section>
+
+      <aside class="space-y-4 xl:sticky xl:top-4">
+        <section class="glass rounded-[1.8rem] p-4">
+          <div class="flex items-center justify-between gap-3 mb-3">
+            <h2 class="font-tech text-xs font-black uppercase tracking-[0.18em] text-cyan-200">Session Library</h2>
+            <span id="task-count" class="text-[10px] text-slate-400 font-bold">0 tasks</span>
+          </div>
+          <details class="mb-3">
+            <summary class="cursor-pointer rounded-xl border border-slate-800 bg-slate-950/40 p-3 text-xs text-slate-300 flex justify-between items-center">
+              <span><i class="fa-solid fa-gauge-high text-cyan-200"></i> AI利用状況</span>
+              <i class="fa-solid fa-chevron-down text-slate-500"></i>
+            </summary>
+            <div id="limit-status" class="rounded-xl bg-slate-950/50 border border-slate-800 p-3 text-xs text-slate-300 mt-2">同期してください。</div>
+          </details>
+          <div id="problem-list" class="space-y-2 max-h-72 overflow-y-auto pr-1"></div>
+        </section>
+
+        <section id="feedback-panel" class="hidden glass rounded-[1.8rem] p-4">
+          <div class="flex gap-3 items-start mb-4">
+            <div id="evaluation" class="eval-badge">-</div>
+            <div>
+              <div class="font-tech text-[10px] tracking-[0.25em] text-cyan-200 font-black uppercase">AI Feedback</div>
+              <p id="overall" class="text-slate-100 font-bold mt-2 leading-relaxed"></p>
+            </div>
+          </div>
+          <div class="space-y-3 text-sm">
+            <div class="rounded-2xl bg-emerald-400/10 border border-emerald-300/20 p-4"><div class="text-emerald-200 font-black text-xs mb-2">良い点</div><p id="good" class="leading-relaxed"></p></div>
+            <div class="rounded-2xl bg-amber-400/10 border border-amber-300/20 p-4"><div class="text-amber-200 font-black text-xs mb-2">直すと良い点</div><p id="improve" class="leading-relaxed"></p></div>
+            <div class="rounded-2xl bg-cyan-400/10 border border-cyan-300/20 p-4"><div class="text-cyan-200 font-black text-xs mb-2">書くときのポイント</div><p id="next" class="leading-relaxed"></p></div>
+          </div>
+          <div id="extra-notes" class="mt-3 text-xs text-slate-300 space-y-2 leading-relaxed"></div>
+        </section>
+      </aside>
     </section>
   </main>
 
@@ -181,6 +210,7 @@
     let writingConfig = { writingAiEnabled: false, writingMaxChars: 300, writingModel: "gpt-5.4-nano" };
     let usage = {};
     const FEEDBACK_LEVELS = ["中学生", "高校生", "先生"];
+    const THEME_MODES = ["theme-cyan", "theme-lime", "theme-amber", "theme-rose"];
 
     const el = (id) => document.getElementById(id);
     const userId = () => `${el("user-class").value.trim()}-${el("user-number").value.trim()}-${normalizeUserName(el("user-name").value)}`;
@@ -222,6 +252,19 @@
       return FEEDBACK_LEVELS.includes(value) ? value : "中学生";
     }
 
+    function applyTheme(theme) {
+      THEME_MODES.forEach((mode) => document.body.classList.remove(mode));
+      const safeTheme = THEME_MODES.includes(theme) ? theme : "theme-cyan";
+      document.body.classList.add(safeTheme);
+      localStorage.setItem("writing_theme_mode", safeTheme);
+    }
+
+    function cycleTheme() {
+      const current = localStorage.getItem("writing_theme_mode") || "theme-cyan";
+      const next = THEME_MODES[(THEME_MODES.indexOf(current) + 1) % THEME_MODES.length] || "theme-cyan";
+      applyTheme(next);
+    }
+
     async function fetchJson(params) {
       const url = `${GAS_URL}?${new URLSearchParams(params).toString()}`;
       const res = await fetch(url);
@@ -256,7 +299,10 @@
             <span class="text-[10px] text-cyan-200 font-black">${problem.unit || "単元未設定"}</span>
             <span class="text-[10px] text-slate-400">${problem.maxChars || writingConfig.writingMaxChars}字まで</span>
           </div>
-          <div class="text-sm font-bold leading-relaxed">${escapeHtml(problem.prompt)}</div>
+          <div class="flex items-start gap-2">
+            <i class="fa-solid fa-chevron-right text-[10px] text-slate-500 mt-1"></i>
+            <div class="text-sm font-bold leading-relaxed">${escapeHtml(problem.prompt)}</div>
+          </div>
         `;
         button.addEventListener("click", () => selectProblem(problem.problemId));
         list.appendChild(button);
@@ -360,6 +406,7 @@
 
     el("save-profile-btn").addEventListener("click", saveProfile);
     el("sync-btn").addEventListener("click", syncWriting);
+    el("theme-btn").addEventListener("click", cycleTheme);
     el("feedback-btn").addEventListener("click", requestFeedback);
     el("feedback-level").addEventListener("change", () => localStorage.setItem("writing_feedback_level", feedbackLevel()));
     el("clear-btn").addEventListener("click", () => {
@@ -371,6 +418,7 @@
     el("answer").addEventListener("input", updateCharCount);
 
     loadProfile();
+    applyTheme(localStorage.getItem("writing_theme_mode") || "theme-cyan");
     syncWriting();
   </script>
 </body>
