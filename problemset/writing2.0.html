@@ -201,6 +201,14 @@
             <button id="clear-btn" class="bg-white/10 hover:bg-white/15 border border-white/10 text-slate-200 rounded-2xl px-5 py-4 text-sm font-black uppercase">Clear</button>
           </div>
 
+          <div id="peer-example-panel" class="hidden rounded-[1.4rem] border border-white/10 bg-slate-950/35 p-4">
+            <button id="toggle-peer-examples-btn" type="button" class="w-full rounded-2xl border border-cyan-300/25 bg-cyan-400/10 hover:bg-cyan-400/15 px-4 py-3 text-sm font-black text-cyan-100 transition-all">
+              <i class="fa-solid fa-users"></i> 他の人の解答例を見る
+            </button>
+            <p class="mt-2 text-xs text-slate-400 leading-relaxed">表現の参考です。名前や番号は表示されません。</p>
+            <div id="peer-examples" class="hidden mt-3 space-y-3"></div>
+          </div>
+
         </div>
       </section>
 
@@ -429,6 +437,7 @@
       el("selected-grade").textContent = selectedProblem.grade || "学年未設定";
       el("max-chars").textContent = `${selectedProblem.maxChars || writingConfig.writingMaxChars}字まで`;
       el("prompt").textContent = selectedProblem.prompt;
+      renderPeerExamples([]);
       updateCharCount();
     }
 
@@ -482,6 +491,7 @@
           answer
         });
         renderFeedback(data.feedback || {});
+        renderPeerExamples(data.peerExamples || []);
         showMessage("フィードバックを記録しました。", "ok");
         await syncWriting();
       } catch (err) {
@@ -511,6 +521,25 @@
       el("extra-notes").innerHTML = notes.join("");
     }
 
+    function renderPeerExamples(examples) {
+      const list = Array.isArray(examples) ? examples : [];
+      const panel = el("peer-example-panel");
+      const body = el("peer-examples");
+      panel.classList.toggle("hidden", list.length === 0);
+      body.classList.add("hidden");
+      el("toggle-peer-examples-btn").innerHTML = `<i class="fa-solid fa-users"></i> 他の人の解答例を見る`;
+      if (!list.length) {
+        body.innerHTML = "";
+        return;
+      }
+      body.innerHTML = list.map((item, index) => `
+        <div class="rounded-2xl border border-slate-700/70 bg-slate-950/55 p-4">
+          <div class="mb-2 text-[10px] font-black tracking-[0.18em] text-cyan-200 uppercase">Example ${index + 1}</div>
+          <p class="example-copy text-slate-100">${escapeHtml(item.answer)}</p>
+        </div>
+      `).join("");
+    }
+
     function escapeHtml(value) {
       return String(value || "").replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
     }
@@ -528,10 +557,19 @@
         ? `<i class="fa-solid fa-eye-slash"></i> 解答例を隠す`
         : `<i class="fa-solid fa-eye"></i> 解答例を見る`;
     });
+    el("toggle-peer-examples-btn").addEventListener("click", () => {
+      const examples = el("peer-examples");
+      const willShow = examples.classList.contains("hidden");
+      examples.classList.toggle("hidden", !willShow);
+      el("toggle-peer-examples-btn").innerHTML = willShow
+        ? `<i class="fa-solid fa-users-slash"></i> 他の人の解答例を隠す`
+        : `<i class="fa-solid fa-users"></i> 他の人の解答例を見る`;
+    });
     el("feedback-level").addEventListener("change", () => localStorage.setItem("writing_feedback_level", feedbackLevel()));
     el("clear-btn").addEventListener("click", () => {
       el("answer").value = "";
       el("message").classList.add("hidden");
+      renderPeerExamples([]);
       updateCharCount();
     });
     el("answer").addEventListener("input", updateCharCount);

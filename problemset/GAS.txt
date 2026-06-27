@@ -1733,18 +1733,64 @@ function getWritingUsageCounts(logSheet, userId) {
   let daily = 0;
   let monthly = 0;
   if (!values || values.length <= 1) return { daily: 0, monthly: 0 };
+  const headers = values[0].map(function(h) { return String(h || '').trim(); });
+  const map = getHeaderIndexMap(headers);
+  const dateIdx = map["日時"] === undefined ? 0 : map["日時"];
+  const userIdx = map["ユーザーID"] === undefined ? 1 : map["ユーザーID"];
+  const statusIdx = map["status"];
   for (let i = 1; i < values.length; i++) {
     const row = values[i];
-    const status = String(row[18] || '').trim();
+    const status = statusIdx === undefined ? "" : String(row[statusIdx] || '').trim();
     if (["ok", "api_error"].indexOf(status) < 0) continue;
-    const date = row[0] instanceof Date ? row[0] : new Date(row[0]);
+    const date = row[dateIdx] instanceof Date ? row[dateIdx] : new Date(row[dateIdx]);
     if (isNaN(date.getTime())) continue;
     const rowDay = Utilities.formatDate(date, "Asia/Tokyo", "yyyy-MM-dd");
     const rowMonth = Utilities.formatDate(date, "Asia/Tokyo", "yyyy-MM");
     if (rowMonth === monthKey) monthly++;
-    if (String(row[1] || '') === String(userId || '') && rowDay === todayKey) daily++;
+    if (String(row[userIdx] || '') === String(userId || '') && rowDay === todayKey) daily++;
   }
   return { daily: daily, monthly: monthly };
+}
+
+function getWritingPeerExamples(logSheet, problemId, currentUserId, limit) {
+  const values = logSheet.getDataRange().getValues();
+  const maxItems = Math.max(1, Number(limit) || 3);
+  if (!values || values.length <= 1 || !problemId) return [];
+  const headers = values[0].map(function(h) { return String(h || '').trim(); });
+  const map = getHeaderIndexMap(headers);
+  const problemIdx = map["problemId"];
+  const userIdx = map["ユーザーID"];
+  const answerIdx = map["回答"];
+  const evalIdx = map["評価"];
+  const statusIdx = map["status"];
+  const dateIdx = map["日時"];
+  if (problemIdx === undefined || answerIdx === undefined || evalIdx === undefined) return [];
+  const seen = {};
+  const candidates = [];
+  for (let i = 1; i < values.length; i++) {
+    const row = values[i];
+    if (String(row[problemIdx] || '').trim() !== String(problemId || '').trim()) continue;
+    if (userIdx !== undefined && String(row[userIdx] || '').trim() === String(currentUserId || '').trim()) continue;
+    if (statusIdx !== undefined && String(row[statusIdx] || '').trim() !== "ok") continue;
+    const evaluation = normalizeWritingEvaluation(row[evalIdx]);
+    if (["S", "A"].indexOf(evaluation) < 0) continue;
+    const answer = String(row[answerIdx] || '').trim();
+    if (!answer || seen[answer]) continue;
+    seen[answer] = true;
+    const rawDate = dateIdx === undefined ? "" : row[dateIdx];
+    const date = rawDate instanceof Date ? rawDate : new Date(rawDate);
+    candidates.push({
+      answer: answer,
+      evaluation: evaluation,
+      dateMs: isNaN(date.getTime()) ? 0 : date.getTime()
+    });
+  }
+  candidates.sort(function(a, b) {
+    return compareWritingEvaluation(b.evaluation, a.evaluation) || b.dateMs - a.dateMs || a.answer.length - b.answer.length;
+  });
+  return candidates.slice(0, maxItems).map(function(item) {
+    return { answer: item.answer, evaluation: item.evaluation };
+  });
 }
 
 function appendWritingLog(logSheet, entry) {
@@ -2058,7 +2104,14 @@ function handleGradeWriting(p) {
       "model": model, "status": "ok", "requestTokens": feedback.requestTokens, "responseTokens": feedback.responseTokens,
       "評価レベル": feedbackLevel, "parseStatus": result.parseStatus || "fallback"
     });
-    return returnJson({ success: true, feedback: result, model: model, feedbackLevel: feedbackLevel, parseStatus: result.parseStatus || "fallback" });
+    return returnJson({
+      success: true,
+      feedback: result,
+      peerExamples: getWritingPeerExamples(sheets.logSheet, problemId, userId, 3),
+      model: model,
+      feedbackLevel: feedbackLevel,
+      parseStatus: result.parseStatus || "fallback"
+    });
   } catch (err) {
     return returnJson({ error: "記述フィードバック処理に失敗しました: " + err.toString() });
   } finally {
