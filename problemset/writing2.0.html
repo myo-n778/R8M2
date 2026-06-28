@@ -208,6 +208,10 @@
             <button id="clear-btn" class="bg-white/10 hover:bg-white/15 border border-white/10 text-slate-200 rounded-2xl px-5 py-4 text-sm font-black uppercase">Clear</button>
           </div>
           <p id="voice-status" class="hidden text-xs text-slate-400 leading-relaxed"></p>
+          <label class="inline-flex items-center gap-2 text-xs text-slate-300 leading-relaxed">
+            <input id="voice-manual-stop" type="checkbox" class="accent-cyan-300">
+            手動で停止するまで続ける
+          </label>
 
           <div id="peer-example-panel" class="hidden rounded-[1.4rem] border border-white/10 bg-slate-950/35 p-4">
             <button id="toggle-peer-examples-btn" type="button" class="w-full rounded-2xl border border-cyan-300/25 bg-cyan-400/10 hover:bg-cyan-400/15 px-4 py-3 text-sm font-black text-cyan-100 transition-all">
@@ -289,6 +293,7 @@
     let usage = {};
     let speechRecognition = null;
     let isVoiceInputActive = false;
+    let voiceStopRequested = false;
     const FEEDBACK_LEVELS = ["中学生", "高校生", "先生"];
     const THEME_SEQUENCE = ["modeA", "modeB", "modeC", "modeE", "modeF", "modeG", "t16", "t31"];
     const THEMES = {
@@ -303,6 +308,7 @@
     };
     const FONT_SIZE_MODES = ["small", "standard", "large", "xlarge"];
     const FONT_SIZE_STORAGE_KEY = "writing_font_size_mode";
+    const VOICE_MANUAL_STOP_STORAGE_KEY = "writing_voice_manual_stop";
 
     const el = (id) => document.getElementById(id);
     const userId = () => `${el("user-class").value.trim()}-${el("user-number").value.trim()}-${normalizeUserName(el("user-name").value)}`;
@@ -406,6 +412,10 @@
       return window.SpeechRecognition || window.webkitSpeechRecognition || null;
     }
 
+    function isVoiceManualStopMode() {
+      return !!el("voice-manual-stop") && el("voice-manual-stop").checked;
+    }
+
     function setVoiceStatus(text, type = "info") {
       const status = el("voice-status");
       status.classList.remove("hidden", "text-slate-400", "text-cyan-200", "text-rose-200", "text-lime-200");
@@ -443,13 +453,15 @@
       speechRecognition = new Ctor();
       speechRecognition.lang = "ja-JP";
       speechRecognition.interimResults = false;
-      speechRecognition.continuous = false;
+      speechRecognition.continuous = isVoiceManualStopMode();
       speechRecognition.onstart = () => {
+        voiceStopRequested = false;
         setVoiceButtonActive(true);
-        setVoiceStatus("話してください。認識した文字を回答欄に追加します。", "active");
+        setVoiceStatus(isVoiceManualStopMode() ? "話してください。停止を押すまで続けます。" : "話してください。認識した文字を回答欄に追加します。", "active");
       };
       speechRecognition.onresult = (event) => {
         const transcript = Array.from(event.results || [])
+          .slice(event.resultIndex || 0)
           .map((result) => result[0] && result[0].transcript ? result[0].transcript.trim() : "")
           .filter(Boolean)
           .join("");
@@ -459,12 +471,23 @@
         }
       };
       speechRecognition.onerror = (event) => {
+        voiceStopRequested = true;
         const message = event.error === "not-allowed"
           ? "マイクの使用が許可されていません。ブラウザのマイク許可を確認してください。"
           : "音声入力に失敗しました。もう一度試すか、キーボード入力を使ってください。";
         setVoiceStatus(message, "error");
       };
-      speechRecognition.onend = () => setVoiceButtonActive(false);
+      speechRecognition.onend = () => {
+        if (isVoiceManualStopMode() && isVoiceInputActive && !voiceStopRequested) {
+          try {
+            speechRecognition.start();
+            return;
+          } catch (err) {
+            setVoiceStatus("ブラウザ側で音声入力が終了しました。もう一度、音声入力を押してください。", "error");
+          }
+        }
+        setVoiceButtonActive(false);
+      };
     }
 
     function toggleVoiceInput() {
@@ -473,14 +496,28 @@
         return;
       }
       if (isVoiceInputActive) {
+        voiceStopRequested = true;
         speechRecognition.stop();
         return;
       }
       try {
+        voiceStopRequested = false;
+        speechRecognition.continuous = isVoiceManualStopMode();
         speechRecognition.start();
       } catch (err) {
         setVoiceStatus("音声入力を開始できませんでした。少し待ってからもう一度試してください。", "error");
       }
+    }
+
+    function loadVoiceInputSettings() {
+      const checkbox = el("voice-manual-stop");
+      if (!checkbox) return;
+      checkbox.checked = localStorage.getItem(VOICE_MANUAL_STOP_STORAGE_KEY) === "true";
+      checkbox.addEventListener("change", () => {
+        localStorage.setItem(VOICE_MANUAL_STOP_STORAGE_KEY, checkbox.checked ? "true" : "false");
+        if (speechRecognition) speechRecognition.continuous = checkbox.checked;
+        setVoiceStatus(checkbox.checked ? "手動停止モードにしました。停止を押すまで続けます。" : "自動終了モードにしました。短い入力向きです。", "info");
+      });
     }
 
     async function fetchJson(params) {
@@ -717,6 +754,7 @@
       next: "--"
     });
     loadProfile();
+    loadVoiceInputSettings();
     initVoiceInput();
     applyFontSizeMode(localStorage.getItem(FONT_SIZE_STORAGE_KEY) || "standard");
     applyTheme(localStorage.getItem("ethics_theme_mode") || "modeA");
