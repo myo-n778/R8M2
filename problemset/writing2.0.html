@@ -277,6 +277,41 @@
         </section>
       </aside>
     </section>
+
+    <section class="mt-6">
+      <details id="history-details" class="glass rounded-[1.8rem] p-4">
+        <summary class="cursor-pointer list-none">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 class="font-tech text-xs font-black uppercase tracking-[0.18em] text-cyan-200">My History</h2>
+              <p class="mt-1 text-xs text-slate-400">自分の記述履歴を確認できます。</p>
+            </div>
+            <span id="history-count" class="text-xs font-bold text-slate-400">0 records</span>
+          </div>
+        </summary>
+        <div class="mt-4 space-y-4">
+          <div class="grid md:grid-cols-[1fr_auto_auto] gap-3">
+            <label class="block">
+              <span class="block mb-1 text-[10px] font-black tracking-[0.16em] text-slate-400 uppercase">Problem</span>
+              <select id="history-problem-filter" class="w-full rounded-2xl border border-slate-700 bg-slate-950/70 px-4 py-3 text-sm text-slate-100 outline-none focus:border-cyan-400"></select>
+            </label>
+            <label class="block">
+              <span class="block mb-1 text-[10px] font-black tracking-[0.16em] text-slate-400 uppercase">Sort</span>
+              <select id="history-sort" class="w-full rounded-2xl border border-slate-700 bg-slate-950/70 px-4 py-3 text-sm text-slate-100 outline-none focus:border-cyan-400">
+                <option value="newest">新しい順</option>
+                <option value="oldest">古い順</option>
+              </select>
+            </label>
+            <div class="flex items-end">
+              <button id="history-more-btn" type="button" class="w-full rounded-2xl border border-white/10 bg-white/10 hover:bg-white/15 px-4 py-3 text-sm font-black text-slate-100">
+                さらに表示
+              </button>
+            </div>
+          </div>
+          <div id="history-list" class="space-y-3"></div>
+        </div>
+      </details>
+    </section>
   </main>
 
   <script src="./common/science-shared.js"></script>
@@ -291,6 +326,8 @@
     let selectedProblem = null;
     let writingConfig = { writingAiEnabled: false, writingMaxChars: 300, writingModel: "gpt-5.4-nano" };
     let usage = {};
+    let writingHistory = [];
+    let historyVisibleCount = 5;
     let speechRecognition = null;
     let isVoiceInputActive = false;
     let voiceStopRequested = false;
@@ -563,6 +600,18 @@
         button.addEventListener("click", () => selectProblem(problem.problemId));
         list.appendChild(button);
       });
+      renderHistoryControls();
+    }
+
+    function renderHistoryControls() {
+      const select = el("history-problem-filter");
+      if (!select) return;
+      const current = select.value || "all";
+      select.innerHTML = `<option value="all">すべての問題</option>` + (writingProblems || []).map((problem) => {
+        const label = `${problem.unit || "単元未設定"}: ${problem.prompt || problem.problemId}`;
+        return `<option value="${escapeHtml(problem.problemId)}">${escapeHtml(label)}</option>`;
+      }).join("");
+      select.value = Array.from(select.options).some((option) => option.value === current) ? current : "all";
     }
 
     function selectProblem(problemId) {
@@ -598,8 +647,11 @@
         writingProblems = data.problems;
         writingConfig = { ...writingConfig, ...(data.config || {}) };
         usage = data.usage || {};
+        writingHistory = Array.isArray(data.myHistory) ? data.myHistory : [];
+        historyVisibleCount = 5;
         renderLimits();
         renderProblems();
+        renderWritingHistory();
       } catch (err) {
         showMessage(`同期に失敗しました: ${err.message}`, "error");
       }
@@ -708,6 +760,74 @@
       `).join("");
     }
 
+    function historyTimeValue(item) {
+      const value = Date.parse(String(item.date || '').replace(/\//g, "-"));
+      return Number.isNaN(value) ? 0 : value;
+    }
+
+    function filteredWritingHistory() {
+      const problemFilter = el("history-problem-filter") ? el("history-problem-filter").value : "all";
+      const sortMode = el("history-sort") ? el("history-sort").value : "newest";
+      return (writingHistory || [])
+        .filter((item) => problemFilter === "all" || String(item.problemId || "") === problemFilter)
+        .sort((a, b) => sortMode === "oldest" ? historyTimeValue(a) - historyTimeValue(b) : historyTimeValue(b) - historyTimeValue(a));
+    }
+
+    function renderWritingHistory() {
+      const list = el("history-list");
+      if (!list) return;
+      const filtered = filteredWritingHistory();
+      const visible = filtered.slice(0, historyVisibleCount);
+      el("history-count").textContent = `${filtered.length} records`;
+      el("history-more-btn").classList.toggle("hidden", visible.length >= filtered.length);
+      if (!isProfileReady()) {
+        list.innerHTML = `<div class="rounded-2xl border border-slate-800 bg-slate-950/40 p-4 text-sm text-slate-400">ユーザー情報を保存すると、自分の履歴を表示できます。</div>`;
+        return;
+      }
+      if (!filtered.length) {
+        list.innerHTML = `<div class="rounded-2xl border border-slate-800 bg-slate-950/40 p-4 text-sm text-slate-400">表示できる履歴はまだありません。</div>`;
+        return;
+      }
+      list.innerHTML = visible.map((item) => {
+        const title = item.prompt || (writingProblems.find((problem) => problem.problemId === item.problemId) || {}).prompt || item.problemId || "問題";
+        const meta = [item.date, item.unit, item.grade].filter(Boolean).map(escapeHtml).join(" / ");
+        return `
+          <details class="rounded-2xl border border-slate-700/70 bg-slate-950/45 p-4">
+            <summary class="cursor-pointer list-none">
+              <div class="flex items-start justify-between gap-3">
+                <div class="min-w-0">
+                  <div class="text-[11px] font-bold text-slate-400">${meta}</div>
+                  <div class="mt-1 text-sm font-black leading-relaxed text-slate-100">${escapeHtml(title)}</div>
+                </div>
+                <span class="shrink-0 rounded-full border border-cyan-300/30 bg-cyan-400/10 px-3 py-1 text-sm font-black text-cyan-100">${escapeHtml(item.evaluation || "-")}</span>
+              </div>
+            </summary>
+            <div class="mt-4 grid gap-3">
+              <div class="rounded-2xl bg-white/5 border border-white/10 p-3">
+                <div class="mb-1 text-[10px] font-black tracking-[0.16em] text-slate-400 uppercase">Your Answer</div>
+                <p class="leading-relaxed text-slate-100">${escapeHtml(item.answer || "--")}</p>
+              </div>
+              <div class="rounded-2xl bg-cyan-400/10 border border-cyan-300/20 p-3">
+                <div class="mb-1 text-[10px] font-black tracking-[0.16em] text-cyan-200 uppercase">Feedback</div>
+                <p class="leading-relaxed text-slate-100">${escapeHtml(item.overall || "--")}</p>
+              </div>
+              <div class="grid md:grid-cols-2 gap-3">
+                <div class="rounded-2xl bg-emerald-400/10 border border-emerald-300/20 p-3">
+                  <div class="mb-1 text-[10px] font-black text-emerald-200">良い点</div>
+                  <p class="leading-relaxed text-slate-100">${escapeHtml(item.good || "--")}</p>
+                </div>
+                <div class="rounded-2xl bg-amber-400/10 border border-amber-300/20 p-3">
+                  <div class="mb-1 text-[10px] font-black text-amber-200">直すと良い点</div>
+                  <p class="leading-relaxed text-slate-100">${escapeHtml(item.improve || "--")}</p>
+                </div>
+              </div>
+              ${item.keyPoint || item.scienceNote ? `<div class="rounded-2xl bg-rose-400/10 border border-rose-300/20 p-3"><div class="mb-1 text-[10px] font-black text-rose-200">理科の補足</div><p class="leading-relaxed text-slate-100">${escapeHtml(item.keyPoint || item.scienceNote)}</p></div>` : ""}
+            </div>
+          </details>
+        `;
+      }).join("");
+    }
+
     function escapeHtml(value) {
       return String(value || "").replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
     }
@@ -735,6 +855,18 @@
         : `<i class="fa-solid fa-users"></i> 他の人の解答例を見る`;
     });
     el("feedback-level").addEventListener("change", () => localStorage.setItem("writing_feedback_level", feedbackLevel()));
+    el("history-problem-filter").addEventListener("change", () => {
+      historyVisibleCount = 5;
+      renderWritingHistory();
+    });
+    el("history-sort").addEventListener("change", () => {
+      historyVisibleCount = 5;
+      renderWritingHistory();
+    });
+    el("history-more-btn").addEventListener("click", () => {
+      historyVisibleCount += 5;
+      renderWritingHistory();
+    });
     el("clear-btn").addEventListener("click", () => {
       el("answer").value = "";
       el("message").classList.add("hidden");

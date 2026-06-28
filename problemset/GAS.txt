@@ -1795,6 +1795,68 @@ function getWritingPeerExamples(logSheet, problemId, currentUserId, limit) {
   });
 }
 
+function getWritingUserHistory(logSheet, userId, problems, limit) {
+  const maxItems = Math.max(5, Math.min(100, Number(limit) || 50));
+  if (!userId) return [];
+  const values = logSheet.getDataRange().getValues();
+  if (!values || values.length <= 1) return [];
+  const headers = values[0].map(function(h) { return String(h || '').trim(); });
+  const map = getHeaderIndexMap(headers);
+  const userIdx = map["ユーザーID"];
+  const dateIdx = map["日時"];
+  const problemIdx = map["problemId"];
+  const unitIdx = map["単元"];
+  const gradeIdx = map["学年"];
+  const answerIdx = map["回答"];
+  const evalIdx = map["評価"];
+  const overallIdx = map["AIコメント"];
+  const goodIdx = map["良い点"];
+  const improveIdx = map["直すと良い点"];
+  const nextIdx = map["次に意識すること"];
+  const scienceNoteIdx = map["理科の補足"];
+  const keyPointIdx = map["重要ポイント"];
+  const statusIdx = map["status"];
+  if (userIdx === undefined || dateIdx === undefined || problemIdx === undefined) return [];
+  const problemMap = {};
+  (problems || []).forEach(function(problem) {
+    problemMap[String(problem.problemId || '').trim()] = problem;
+  });
+  const history = [];
+  for (let i = 1; i < values.length; i++) {
+    const row = values[i];
+    if (String(row[userIdx] || '').trim() !== String(userId || '').trim()) continue;
+    if (statusIdx !== undefined && String(row[statusIdx] || '').trim() !== "ok") continue;
+    const problemId = String(row[problemIdx] || '').trim();
+    const problem = problemMap[problemId] || {};
+    const rawDate = row[dateIdx];
+    const date = rawDate instanceof Date ? rawDate : new Date(rawDate);
+    const dateMs = isNaN(date.getTime()) ? 0 : date.getTime();
+    history.push({
+      date: dateMs ? Utilities.formatDate(date, "Asia/Tokyo", "yyyy/MM/dd HH:mm") : String(rawDate || ''),
+      dateMs: dateMs,
+      problemId: problemId,
+      unit: unitIdx === undefined ? (problem.unit || "") : String(row[unitIdx] || problem.unit || ''),
+      grade: gradeIdx === undefined ? (problem.grade || "") : String(row[gradeIdx] || problem.grade || ''),
+      prompt: problem.prompt || "",
+      answer: answerIdx === undefined ? "" : String(row[answerIdx] || ''),
+      evaluation: evalIdx === undefined ? "" : normalizeWritingEvaluation(row[evalIdx]),
+      overall: overallIdx === undefined ? "" : String(row[overallIdx] || ''),
+      good: goodIdx === undefined ? "" : String(row[goodIdx] || ''),
+      improve: improveIdx === undefined ? "" : String(row[improveIdx] || ''),
+      next: nextIdx === undefined ? "" : String(row[nextIdx] || ''),
+      scienceNote: scienceNoteIdx === undefined ? "" : String(row[scienceNoteIdx] || ''),
+      keyPoint: keyPointIdx === undefined ? "" : String(row[keyPointIdx] || '')
+    });
+  }
+  history.sort(function(a, b) {
+    return b.dateMs - a.dateMs;
+  });
+  return history.slice(0, maxItems).map(function(item) {
+    delete item.dateMs;
+    return item;
+  });
+}
+
 function appendWritingLog(logSheet, entry) {
   const row = getWritingLogHeaders().map(function(header) {
     return entry[header] !== undefined && entry[header] !== null ? entry[header] : "";
@@ -2051,8 +2113,9 @@ function handleSyncWriting(p) {
     const usage = getWritingUsageCounts(sheets.logSheet, userId);
     const dailyLimit = Number(runtimeConfig.writingDailyLimitPerUser) || 0;
     const monthlyLimit = Number(runtimeConfig.writingMonthlyLimitTotal) || 0;
+    const rawProblems = readWritingProblems(ss, runtimeConfig);
     const bestResults = getWritingBestResultsByProblem(sheets.logSheet, userId);
-    const problems = readWritingProblems(ss, runtimeConfig).map(function(problem) {
+    const problems = rawProblems.map(function(problem) {
       const best = bestResults[problem.problemId] || null;
       return { problemId: problem.problemId, unit: problem.unit, grade: problem.grade, prompt: problem.prompt, maxChars: problem.maxChars, order: problem.order, bestEvaluation: best ? best.evaluation : "", bestEvaluationDate: best ? best.date : "" };
     });
@@ -2071,7 +2134,8 @@ function handleSyncWriting(p) {
         monthlyUsed: usage.monthly,
         dailyRemaining: dailyLimit > 0 ? Math.max(0, dailyLimit - usage.daily) : null,
         monthlyRemaining: monthlyLimit > 0 ? Math.max(0, monthlyLimit - usage.monthly) : null
-      }
+      },
+      myHistory: getWritingUserHistory(sheets.logSheet, userId, rawProblems, 50)
     });
   } catch (err) {
     return returnJson({ error: "記述問題の同期に失敗しました: " + err.toString() });
