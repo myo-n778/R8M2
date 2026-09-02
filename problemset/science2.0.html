@@ -542,6 +542,7 @@
                     <p id="final-praise" class="font-flashy text-xs md:text-lg uppercase tracking-[0.3em]" style="color: var(--accent-primary)"></p>
                     <p id="final-praise-jp" class="text-indigo-200 font-bold text-lg md:text-2xl mt-2 px-4 text-left"></p>
                     <p id="final-message" class="text-slate-400 text-sm leading-relaxed max-w-lg mx-auto italic"></p>
+                    <p id="final-save-status" class="text-slate-400 text-xs min-h-[18px]" aria-live="polite"></p>
                 </div>
                 <div class="grid grid-cols-2 gap-4">
                     <div class="bg-slate-900/90 p-4 rounded-xl border-l-4" style="border-color: var(--accent-primary)"><p class="text-[8px] text-slate-500 font-black uppercase mb-1">Accuracy</p><p class="text-2xl font-flashy" style="color: var(--accent-primary)"><span id="final-score">0</span>%</p></div>
@@ -2929,53 +2930,80 @@
         }
 
         function finishSession() {
-            if (isSessionFinalizing || sessionLogCompleted || sessionLogPromise) return;
+            // 二重タップだけを止める。古い保存Promiseの有無で結果画面を止めない。
+            if (isSessionFinalizing) return;
             isSessionFinalizing = true;
-            const oldExp = parseInt(getEl('total-neural-exp').innerText) || 0;
+
+            const total = quizData.length;
+            const pct = total > 0 ? Math.round((score / total) * 100) : 0;
+            const oldExp = parseInt(getEl('total-neural-exp')?.innerText) || 0;
             const oldLv = Math.floor(oldExp / 10);
-            getEl('quiz-screen').classList.add('hidden'); getEl('result-screen').classList.remove('hidden');
-            const pct = Math.round((score / quizData.length) * 100); 
             const lvUpMsg = getEl('level-up-msg');
-            if (lvUpMsg) lvUpMsg.classList.add('hidden');
             const expNoteEl = getEl('final-exp-note');
+            const saveStatusEl = getEl('final-save-status');
+            const nextButton = getEl('next-btn-action');
+
+            console.info('[session-finish] result screen requested', {
+                currentIdx,
+                total,
+                score,
+                sessionId: currentSessionId,
+                hasPendingLog: Boolean(sessionLogPromise)
+            });
+
+            if (nextButton) {
+                nextButton.disabled = true;
+                nextButton.setAttribute('aria-disabled', 'true');
+            }
+            getEl('quiz-screen')?.classList.add('hidden');
+            getEl('result-screen')?.classList.remove('hidden');
+            if (lvUpMsg) lvUpMsg.classList.add('hidden');
             if (expNoteEl) expNoteEl.innerText = '';
-            getEl('final-exp-gained').innerText = score;
-            logDetailedResultsToSpreadsheet(pct, score, quizData.length).then((logResult) => {
+            if (saveStatusEl) saveStatusEl.innerText = '成績を記録しています…';
+            if (getEl('final-exp-gained')) getEl('final-exp-gained').innerText = score;
+            if (getEl('final-score')) getEl('final-score').innerText = pct;
+
+            const goalMsg = getEl('goal-eval-msg');
+            if (goalMsg) {
+                if (pct >= selectedGoal) {
+                    goalMsg.innerText = 'MISSION ACCOMPLISHED: Target Attained';
+                    goalMsg.className = 'text-[10px] font-black uppercase tracking-[0.3em] mb-2 text-emerald-400';
+                } else {
+                    goalMsg.innerText = 'TARGET MISSED: ' + selectedGoal + '% required';
+                    goalMsg.className = 'text-[10px] font-black uppercase tracking-[0.3em] mb-2 text-rose-400';
+                }
+            }
+            const resKey = pct === 100 ? 'perfect' : pct >= 80 ? 'high' : pct >= 60 ? 'mid' : 'low';
+            if (getEl('final-praise')) getEl('final-praise').innerText = praiseWords[resKey][Math.floor(Math.random() * praiseWords[resKey].length)];
+            if (getEl('final-praise-jp')) getEl('final-praise-jp').innerText = feedbackJP[resKey][Math.floor(Math.random() * feedbackJP[resKey].length)];
+            if (getEl('final-icon')) getEl('final-icon').innerText = pct === 100 ? '👑' : pct >= 80 ? '🎯' : pct >= 60 ? '🔋' : '⚠️';
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+
+            // 画面遷移後に保存する。通信の遅延・失敗で結果画面は止まらない。
+            Promise.resolve(logDetailedResultsToSpreadsheet(pct, score, total)).then((logResult) => {
                 const appliedExpRaw = parseInt(logResult && logResult.appliedExp);
                 const appliedExp = Number.isFinite(appliedExpRaw) ? appliedExpRaw : score;
-                getEl('final-exp-gained').innerText = appliedExp;
-                if (expNoteEl) {
-                    expNoteEl.innerText = (logResult && logResult.expReason) ? `※ ${logResult.expReason}` : '';
-                }
+                if (getEl('final-exp-gained')) getEl('final-exp-gained').innerText = appliedExp;
+                if (expNoteEl) expNoteEl.innerText = (logResult && logResult.expReason) ? `※ ${logResult.expReason}` : '';
+                if (saveStatusEl) saveStatusEl.innerText = logResult ? '成績を記録しました。' : '成績を記録できませんでした。後で同期してください。';
                 const newLv = Math.floor((oldExp + appliedExp) / 10);
                 if (lvUpMsg) {
                     if (newLv > oldLv) lvUpMsg.classList.remove('hidden');
                     else lvUpMsg.classList.add('hidden');
                 }
+                console.info('[session-finish] score save finished', { status: logResult?.status || 'no_response', sessionId: currentSessionId });
+            }).catch((error) => {
+                console.error('[session-finish] score save failed', error);
+                if (saveStatusEl) saveStatusEl.innerText = '成績を記録できませんでした。後で同期してください。';
             }).finally(() => {
-                if (!sessionLogCompleted) isSessionFinalizing = false;
+                isSessionFinalizing = false;
             });
-            
-            // 復習システムの情報をローカルストレージに保存
+
             try {
                 localStorage.setItem('ethics_question_stats', JSON.stringify(questionStats));
             } catch (e) {
                 console.error('復習システムの情報の保存に失敗しました:', e);
             }
-            getEl('final-score').innerText = pct;
-            const goalMsg = getEl('goal-eval-msg');
-            if (pct >= selectedGoal) {
-                goalMsg.innerText = "MISSION ACCOMPLISHED: Target Attained";
-                goalMsg.className = "text-[10px] font-black uppercase tracking-[0.3em] mb-2 text-emerald-400";
-            } else {
-                goalMsg.innerText = "TARGET MISSED: " + selectedGoal + "% required";
-                goalMsg.className = "text-[10px] font-black uppercase tracking-[0.3em] mb-2 text-rose-400";
-            }
-            const resKey = pct === 100 ? 'perfect' : pct >= 80 ? 'high' : pct >= 60 ? 'mid' : 'low';
-            getEl('final-praise').innerText = praiseWords[resKey][Math.floor(Math.random() * praiseWords[resKey].length)];
-            getEl('final-praise-jp').innerText = feedbackJP[resKey][Math.floor(Math.random() * feedbackJP[resKey].length)];
-            getEl('final-icon').innerText = pct === 100 ? "👑" : pct >= 80 ? "🎯" : pct >= 60 ? "🔋" : "⚠️";
-            window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
         window.showHome = () => { getEl('quiz-screen').classList.add('hidden'); getEl('result-screen').classList.add('hidden'); getEl('home-screen').classList.remove('hidden'); updateStatsUI(); window.renderEraMenu(); window.scrollTo({ top: 0, behavior: 'smooth' }); };
