@@ -632,6 +632,8 @@
         let quizData = []; let currentIdx = 0; let score = 0; let streak = 0;
         let canAnswer = true; let chartInstance = null;
         let isSessionFinalizing = false;
+        let isQuestionTransitioning = false;
+        let syncInFlightPromise = null;
         let currentSessionId = "";
         let sessionLogPromise = null;
         let sessionLogCompleted = false;
@@ -2726,6 +2728,7 @@
             await loadImageMap();
             currentIdx = 0; score = 0; streak = 0; sessionAnswers = []; 
             isSessionFinalizing = false;
+            isQuestionTransitioning = false;
             const userId = `${USER_CLASS}-${USER_NUMBER}-${USER_NAME}`;
             currentSessionId = createSessionId(userId);
             sessionLogPromise = null;
@@ -2736,8 +2739,55 @@
             }
             getEl('home-screen').classList.add('hidden'); getEl('quiz-screen').classList.remove('hidden'); getEl('q-total').innerText = quizData.length; renderDots(); showQuestion(); 
         }
-        function showQuestion() { 
-            canAnswer = true; const q = quizData[currentIdx]; getEl('q-current').innerText = currentIdx + 1; 
+        function isQuestionRenderable(q) {
+            return Boolean(
+                q &&
+                q.id !== undefined && q.id !== null &&
+                String(q.question || '').trim() &&
+                String(q.answer || '').trim() &&
+                Array.isArray(q.options) &&
+                q.options.length >= 2 &&
+                q.options.every((option) => String(option ?? '').trim())
+            );
+        }
+
+        function showQuestionRecovery(error) {
+            console.error('[question-flow] question display failed', {
+                currentIdx,
+                questionId: quizData[currentIdx]?.id || null,
+                error
+            });
+            canAnswer = false;
+            getEl('feedback-area')?.classList.add('hidden');
+
+            const questionEl = getEl('question-text');
+            if (questionEl) questionEl.textContent = 'この問題を表示できませんでした。もう一度表示してください。';
+
+            const optionsContainer = getEl('options-container');
+            if (!optionsContainer) return;
+            optionsContainer.innerHTML = '';
+
+            const retryButton = document.createElement('button');
+            retryButton.type = 'button';
+            retryButton.className = 'option-btn border-amber-400/60 bg-amber-500/10 text-amber-100';
+            retryButton.textContent = 'この問題をもう一度表示';
+            retryButton.onclick = () => showQuestion();
+
+            const homeButton = document.createElement('button');
+            homeButton.type = 'button';
+            homeButton.className = 'option-btn text-slate-200';
+            homeButton.textContent = 'ホームへ戻る';
+            homeButton.onclick = () => window.showHome();
+
+            optionsContainer.append(retryButton, homeButton);
+        }
+
+        function showQuestion() {
+            try {
+                const q = quizData[currentIdx];
+                if (!isQuestionRenderable(q)) throw new Error('問題データが不完全です');
+
+                canAnswer = true; getEl('q-current').innerText = currentIdx + 1;
             getEl('current-accuracy').innerText = (currentIdx === 0 ? 0 : Math.round((score/currentIdx)*100)) + '%'; 
             getEl('current-streak').innerText = streak; getEl('diff-badge').innerText = `${q.era} | ${q.tag}`; 
             const statKey = q.id;
@@ -2777,14 +2827,34 @@
             document.body.scrollTop = 0;          // Safari 対応
             document.documentElement.scrollTop = 0; // その他ブラウザ対応
             // 念のため遅延して再スクロール
-            setTimeout(() => {
-                window.scrollTo({ top: 0, behavior: 'auto' });
-            }, 50);
+                setTimeout(() => {
+                    window.scrollTo({ top: 0, behavior: 'auto' });
+                }, 50);
+            } catch (error) {
+                showQuestionRecovery(error);
+            } finally {
+                isQuestionTransitioning = false;
+            }
         }
         
-        async function handleAnswer(selected, btn) { 
-            if (!canAnswer) return; canAnswer = false; const q = quizData[currentIdx]; const isCorrect = (selected === q.answer); sessionAnswers[currentIdx] = isCorrect; 
+        async function handleAnswer(selected, btn) {
+            if (!canAnswer || isQuestionTransitioning || isSessionFinalizing) return;
+            const q = quizData[currentIdx];
+            if (!isQuestionRenderable(q)) {
+                showQuestionRecovery(new Error('回答対象の問題データが不完全です'));
+                return;
+            }
+
             const statKey = q.id;
+            const previousStat = questionStats[statKey] ? { ...questionStats[statKey] } : null;
+            const previousScore = score;
+            const previousStreak = streak;
+            const hadPreviousAnswer = Object.prototype.hasOwnProperty.call(sessionAnswers, currentIdx);
+            const previousAnswer = sessionAnswers[currentIdx];
+
+            canAnswer = false;
+            try {
+                const isCorrect = (selected === q.answer); sessionAnswers[currentIdx] = isCorrect;
             const exist = questionStats[statKey] || { total: 0, correct: 0 }; 
             const today = new Date();
             today.setHours(0, 0, 0, 0);
@@ -2859,7 +2929,17 @@
             setTimeout(() => renderMath(explanationEl), 100);
             getEl('result-badge').innerText = isCorrect ? 'CORRECT' : 'INCORRECT'; 
             getEl('result-badge').className = "px-6 py-2 rounded-full text-[10px] font-black uppercase w-fit " + (isCorrect ? "bg-emerald-500" : "bg-rose-500"); 
-            const voiceList = isCorrect ? praiseWords.perfect : praiseWords.low; getEl('voice-message').innerText = voiceList[Math.floor(Math.random() * voiceList.length)]; setTimeout(() => { getEl('feedback-area').scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 100); 
+                const voiceList = isCorrect ? praiseWords.perfect : praiseWords.low; getEl('voice-message').innerText = voiceList[Math.floor(Math.random() * voiceList.length)]; setTimeout(() => { getEl('feedback-area').scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 100);
+            } catch (error) {
+                if (previousStat) questionStats[statKey] = previousStat;
+                else delete questionStats[statKey];
+                score = previousScore;
+                streak = previousStreak;
+                if (hadPreviousAnswer) sessionAnswers[currentIdx] = previousAnswer;
+                else delete sessionAnswers[currentIdx];
+                getEl(`dot-${currentIdx}`)?.classList.remove('dot-correct', 'dot-wrong');
+                showQuestionRecovery(error);
+            }
         }
 
         function renderDots() { const bar = getEl('dot-bar'); if(!bar) return; bar.innerHTML = ''; quizData.forEach((_, i) => { const d = document.createElement('div'); d.className = 'progress-dot'; d.id = `dot-${i}`; bar.appendChild(d); }); }
@@ -3006,7 +3086,7 @@
             }
         }
 
-        window.showHome = () => { getEl('quiz-screen').classList.add('hidden'); getEl('result-screen').classList.add('hidden'); getEl('home-screen').classList.remove('hidden'); updateStatsUI(); window.renderEraMenu(); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+        window.showHome = () => { isQuestionTransitioning = false; getEl('quiz-screen').classList.add('hidden'); getEl('result-screen').classList.add('hidden'); getEl('home-screen').classList.remove('hidden'); updateStatsUI(); window.renderEraMenu(); window.scrollTo({ top: 0, behavior: 'smooth' }); };
         
         window.abortQuiz = async () => {
             if (isSessionFinalizing) return;
@@ -3023,7 +3103,7 @@
             }
         };
         
-        window.syncAllFromSpreadsheet = async (isAuto = false) => { 
+        async function syncAllFromSpreadsheetInternal(isAuto = false) {
             if (!FIXED_GAS_URL) return;
             
             // ユーザー情報が設定されていない場合でも問題データは取得できるようにする
@@ -3167,6 +3247,14 @@
                 // 詳細なエラーメッセージを表示
                 showDiagnosticError(e, isAuto);
             } 
+        }
+
+        window.syncAllFromSpreadsheet = (isAuto = false) => {
+            if (syncInFlightPromise) return syncInFlightPromise;
+            syncInFlightPromise = syncAllFromSpreadsheetInternal(isAuto);
+            return syncInFlightPromise.finally(() => {
+                syncInFlightPromise = null;
+            });
         };
         
         function shuffleArray(array) { for (let i = array.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [array[i], array[j]] = [array[j], array[i]]; } return array; }
@@ -3185,36 +3273,9 @@
             low: ["焦る必要はありません。今は知識の穴を見つける最高のチャンス。一つずつ。 ", "まずは基礎単語から再確認してみましょう。土台がしっかりすれば点数は伸びる。", "リンクが少し不安定なだけ. リラックスしてもう一度解説を読んでみてください。", "ここが踏ん張りどころ. 一つずつ丁寧に理解を深めれば、必ず景色が変わります。", "今は間違いを恐れず演習しましょう。その悔しさが、本番の得点に繋がります。", "伸び代は無限大！まずは一番好きな時代から集中的に復習してみるのはどう？ ", "歴史の流れをざっと掴むところから再開しましょう。物語を楽しむ気持ちで。 ", "あなたは今、一番苦しい時期かもしれません。レベルアップには挑戦が必要です。", "点数ではなく、今日新しく知った「知識」に注目. 一歩ずつ前へ進めば大丈夫。", "大丈夫です。どんな名人も、最初は今のあなたと同じ場所からスタートした。 ", "間違えた分だけ、強くなれます。解説を「なるほど」と思うまで読み返して。 ", "深呼吸して、もう一度基礎に立ち返りましょう。急がば回れが最短ルートです。", "自分のペースで大丈夫. 他人と比べる必要はありません。昨日を超えていこう。", "知識を整理するチャンスです。年表を一度自分で書いてみると驚くほど進みます。", "諦めないで。このアプリは、あなたが再び立ち上がるのを何度でもサポートする。", "まずは一つ確実に覚えることから始めよう。その積み重ねが巨大な力になります。", "歴史は繋がりです。断片的な知識を、時代という糸で繋ぎ直す作業を今しよう。", "あなたの挑戦自体が素晴らしい。今日の結果を分析して明日の糧にしてください。", "少しずつでいい。教科書を1ページ読むだけで世界は昨日より広がっています。", "負けないで. あなたの「合格したい」という気持ちを、心から応援しています！"]
         };
 
-        // 新版専用: DOMContentLoadedで同期を実行
+        // 画面初期化だけを行う。同期はwindow.onloadで1回だけ開始する。
         document.addEventListener('DOMContentLoaded', () => {
-            console.log('🚀 [新版] DOMContentLoaded: 初期同期を開始');
-            
-            // ユーザー情報の初期化
             initUserInfo();
-            
-            // ユーザー情報が既に設定されている場合は同期を実行
-            const savedName = localStorage.getItem('ethics_user_name');
-            const savedClass = localStorage.getItem('ethics_user_class');
-            const savedNumber = localStorage.getItem('ethics_user_number');
-            
-            if (savedName && savedClass && savedNumber) {
-                console.log('✅ [新版] ユーザー情報が見つかりました。同期を実行します。');
-                // 少し遅延を入れて、他の初期化が完了してから同期
-                setTimeout(() => {
-                    window.syncAllFromSpreadsheet(true).catch(err => {
-                        console.error('❌ [新版] 初期同期エラー:', err);
-                        showDiagnosticError(err);
-                    });
-                }, 500);
-            } else {
-                console.log('⏸️ [新版] ユーザー情報が未設定。問題データのみ取得します。');
-                // ユーザー情報がなくても問題データは取得可能
-                setTimeout(() => {
-                    window.syncAllFromSpreadsheet(true).catch(err => {
-                        console.error('❌ [新版] 初期同期エラー（ユーザー情報なし）:', err);
-                    });
-                }, 500);
-            }
         });
 
         window.onload = () => {
@@ -3278,14 +3339,18 @@
             if (eraMenuEl) eraMenuEl.addEventListener('scroll', window.updateEraMenuScrollHint);
             window.addEventListener('resize', () => setTimeout(window.updateEraMenuScrollHint, 0));
             setOnClick('next-btn-action', () => {
-                currentIdx++;
-                if (currentIdx < quizData.length) {
+                if (isQuestionTransitioning || isSessionFinalizing) return;
+                isQuestionTransitioning = true;
+                const nextIndex = currentIdx + 1;
+                if (nextIndex < quizData.length) {
+                    currentIdx = nextIndex;
                     // 問題表示前に必ずスクロール
                     window.scrollTo({ top: 0, behavior: 'auto' });
                     document.body.scrollTop = 0;
                     document.documentElement.scrollTop = 0;
                     showQuestion();
                 } else {
+                    isQuestionTransitioning = false;
                     finishSession();
                 }
             });
