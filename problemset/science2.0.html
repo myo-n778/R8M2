@@ -529,6 +529,7 @@
                 </div>
                 <div class="bg-white/5 rounded-[1.5rem] p-6 border border-white/10 shadow-inner"><div id="explanation-content" class="explanation-card text-slate-300 text-sm md:text-base whitespace-pre-line px-4"></div></div>
                 <button id="next-btn-action" class="w-full bg-white text-slate-900 font-black py-4 rounded-2xl text-lg flex justify-center items-center gap-4 group">PROCEED <i class="fas fa-chevron-right group-hover:translate-x-1 transition-transform"></i></button>
+                <button id="recover-progress-btn" type="button" class="w-full text-slate-300 hover:text-white text-xs font-bold py-2 underline underline-offset-4 transition-colors">進まない場合はここをタップ</button>
             </div>
         </div>
 
@@ -3086,6 +3087,29 @@
             }
         }
 
+        function advanceFromAnsweredQuestion({ recovery = false } = {}) {
+            if (!Object.prototype.hasOwnProperty.call(sessionAnswers, currentIdx)) return;
+            if (isSessionFinalizing) return;
+            if (isQuestionTransitioning && !recovery) return;
+
+            // The recovery action may clear a stale UI lock, but never re-scores the answer.
+            isQuestionTransitioning = true;
+            const nextIndex = currentIdx + 1;
+            if (nextIndex < quizData.length) {
+                currentIdx = nextIndex;
+                window.scrollTo({ top: 0, behavior: 'auto' });
+                document.body.scrollTop = 0;
+                document.documentElement.scrollTop = 0;
+                showQuestion();
+                return;
+            }
+
+            isQuestionTransitioning = false;
+            finishSession();
+        }
+
+        window.recoverQuestionProgress = () => advanceFromAnsweredQuestion({ recovery: true });
+
         window.showHome = () => { isQuestionTransitioning = false; getEl('quiz-screen').classList.add('hidden'); getEl('result-screen').classList.add('hidden'); getEl('home-screen').classList.remove('hidden'); updateStatsUI(); window.renderEraMenu(); window.scrollTo({ top: 0, behavior: 'smooth' }); };
         
         window.abortQuiz = async () => {
@@ -3338,22 +3362,8 @@
             const eraMenuEl = getEl('era-menu-container');
             if (eraMenuEl) eraMenuEl.addEventListener('scroll', window.updateEraMenuScrollHint);
             window.addEventListener('resize', () => setTimeout(window.updateEraMenuScrollHint, 0));
-            setOnClick('next-btn-action', () => {
-                if (isQuestionTransitioning || isSessionFinalizing) return;
-                isQuestionTransitioning = true;
-                const nextIndex = currentIdx + 1;
-                if (nextIndex < quizData.length) {
-                    currentIdx = nextIndex;
-                    // 問題表示前に必ずスクロール
-                    window.scrollTo({ top: 0, behavior: 'auto' });
-                    document.body.scrollTop = 0;
-                    document.documentElement.scrollTop = 0;
-                    showQuestion();
-                } else {
-                    isQuestionTransitioning = false;
-                    finishSession();
-                }
-            });
+            setOnClick('next-btn-action', () => advanceFromAnsweredQuestion());
+            setOnClick('recover-progress-btn', window.recoverQuestionProgress);
             setOnClick('sync-all-btn-action', () => window.syncAllFromSpreadsheet(false)); 
             setOnClick('cloud-sync-toggle-btn', () => { const area = getEl('sync-area'); if (area) area.classList.toggle('hidden'); }); 
             setOnClick('app-url-copy-btn', copyAppUrl);
