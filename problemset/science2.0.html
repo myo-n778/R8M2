@@ -598,7 +598,7 @@
     <!-- スクリプト部分は以前のものを継続して使用 -->
     <script>
         const SHARED = window.ScienceShared || {};
-        const FIXED_GAS_URL = SHARED.gasUrl || "https://script.google.com/macros/s/AKfycbxwmiyoUWzBloQMQrpv2qLeT3PJBQfu0KIv7ovVqb3pdQjS6LtT7GUTN9oPHEPKNlHfcg/exec";
+        const FIXED_GAS_URL = SHARED.gasUrl || "https://script.google.com/macros/s/AKfycbwqdkDmwOYt7g1jB7vdjK8JNuBdBxrQyEe8YwKxSpASYn8Q5i36178xZzSA72JE8AJZ/exec";
         const FIXED_SPREADSHEET_URL = "https://docs.google.com/spreadsheets/d/1LCGCVjeiTicyclXFTP0EaxxB_RluZJrveWPo1FdLzsk/edit";
         const IMAGE_MAP_URL = "./data/image-map.json";
         const normalizeUserName = SHARED.normalizeUserName || ((name) => name ? name.normalize('NFKC').trim() : '');
@@ -1670,20 +1670,29 @@
                 isPublic: isRankingPublic ? '1' : '0', 
                 status: USER_STATUS || '' 
             };
-            sessionLogPromise = (async () => {
+            const loggingSessionId = currentSessionId;
+            const pendingLog = (async () => {
                 const result = await fetchWithRetry(`${FIXED_GAS_URL}?${new URLSearchParams(payload).toString()}`);
                 if (result && (result.status === 'success' || result.status === 'duplicate_skipped')) {
-                    sessionLogCompleted = true;
+                    if (currentSessionId === loggingSessionId) sessionLogCompleted = true;
                 }
-                window.syncAllFromSpreadsheet(true);
+                if (currentSessionId === loggingSessionId) {
+                    // 保存の成否と、その後の画面同期の成否を混同しない。
+                    Promise.resolve().then(() => window.syncAllFromSpreadsheet(true)).catch((error) => {
+                        console.error('[session-save] post-save sync failed', error);
+                    });
+                }
                 return result;
             })();
+            sessionLogPromise = pendingLog;
             try {
-                return await sessionLogPromise;
+                return await pendingLog;
             } catch (e) {
                 return null;
             } finally {
-                if (!sessionLogCompleted) sessionLogPromise = null;
+                if (currentSessionId === loggingSessionId && sessionLogPromise === pendingLog && !sessionLogCompleted) {
+                    sessionLogPromise = null;
+                }
             }
         }
 
@@ -2734,6 +2743,11 @@
             currentSessionId = createSessionId(userId);
             sessionLogPromise = null;
             sessionLogCompleted = false;
+            const nextButton = getEl('next-btn-action');
+            if (nextButton) {
+                nextButton.disabled = false;
+                nextButton.removeAttribute('aria-disabled');
+            }
             // シャッフルが有効な場合、問題の出題順をシャッフル
             if (isQuestionShuffleEnabled) {
                 quizData = shuffleArray([...quizData]);
@@ -3016,6 +3030,8 @@
             isSessionFinalizing = true;
 
             const total = quizData.length;
+            const finishedSessionId = currentSessionId;
+            const finishedScore = score;
             const pct = total > 0 ? Math.round((score / total) * 100) : 0;
             const oldExp = parseInt(getEl('total-neural-exp')?.innerText) || 0;
             const oldLv = Math.floor(oldExp / 10);
@@ -3061,23 +3077,27 @@
             window.scrollTo({ top: 0, behavior: 'smooth' });
 
             // 画面遷移後に保存する。通信の遅延・失敗で結果画面は止まらない。
-            Promise.resolve(logDetailedResultsToSpreadsheet(pct, score, total)).then((logResult) => {
+            Promise.resolve(logDetailedResultsToSpreadsheet(pct, finishedScore, total)).then((logResult) => {
+                if (currentSessionId !== finishedSessionId) return;
+                const saved = logResult && (logResult.status === 'success' || logResult.status === 'duplicate_skipped');
                 const appliedExpRaw = parseInt(logResult && logResult.appliedExp);
-                const appliedExp = Number.isFinite(appliedExpRaw) ? appliedExpRaw : score;
+                const appliedExp = saved ? (Number.isFinite(appliedExpRaw) ? appliedExpRaw : finishedScore) : 0;
                 if (getEl('final-exp-gained')) getEl('final-exp-gained').innerText = appliedExp;
                 if (expNoteEl) expNoteEl.innerText = (logResult && logResult.expReason) ? `※ ${logResult.expReason}` : '';
-                if (saveStatusEl) saveStatusEl.innerText = logResult ? '成績を記録しました。' : '成績を記録できませんでした。後で同期してください。';
+                if (saveStatusEl) saveStatusEl.innerText = saved ? '成績を記録しました。' : '成績を記録できませんでした。通信状態を確認してください。';
                 const newLv = Math.floor((oldExp + appliedExp) / 10);
                 if (lvUpMsg) {
                     if (newLv > oldLv) lvUpMsg.classList.remove('hidden');
                     else lvUpMsg.classList.add('hidden');
                 }
-                console.info('[session-finish] score save finished', { status: logResult?.status || 'no_response', sessionId: currentSessionId });
+                console.info('[session-finish] score save finished', { status: logResult?.status || 'no_response', sessionId: finishedSessionId });
             }).catch((error) => {
                 console.error('[session-finish] score save failed', error);
-                if (saveStatusEl) saveStatusEl.innerText = '成績を記録できませんでした。後で同期してください。';
+                if (currentSessionId !== finishedSessionId) return;
+                if (getEl('final-exp-gained')) getEl('final-exp-gained').innerText = 0;
+                if (saveStatusEl) saveStatusEl.innerText = '成績を記録できませんでした。通信状態を確認してください。';
             }).finally(() => {
-                isSessionFinalizing = false;
+                if (currentSessionId === finishedSessionId) isSessionFinalizing = false;
             });
 
             try {

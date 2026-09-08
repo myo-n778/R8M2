@@ -328,7 +328,7 @@ if (hData.length > 1) {
   }
 }
 
-// 重複防止（fail-open）: 同一sessionId、または指定秒以内の同一ユーザー・同一セット・同一得点をスキップ
+// sessionIdがあるクライアントはIDで判定し、時間窓はID未送信の旧クライアントだけに適用する。
 try {
   const duplicateLogWindowSec = Math.max(0, Number(runtimeConfig.duplicateLogWindowSec) || 60);
   const DUP_WINDOW_MS = duplicateLogWindowSec * 1000;
@@ -341,7 +341,7 @@ try {
     const sameSet = String(row[1] || '') === String(p.summaryEra || '') && String(row[2] || '') === String(p.summaryRange || '');
     const sameScore = String(row[4] || '') === String(p.summaryScore || '');
     const sameAcc = String(row[3] || '') === String(p.summaryAccuracy || '');
-    if (sameSession || (withinWindow && sameSet && sameScore && sameAcc)) {
+    if (sameSession || (!sessionId && withinWindow && sameSet && sameScore && sameAcc)) {
       const hasNewFormat = row.length >= 18;
       const cumulativeExpIndex = hasNewFormat ? 10 : 9;
       const currentTotalExp = parseInt(row[cumulativeExpIndex]) || 0;
@@ -1801,51 +1801,52 @@ function updateOverallSummarySheet(ss) {
     const memberData = memberSheet.getDataRange().getValues();
     const maxRows = Math.min(memberData.length - 1, 500); // ヘッダー行を除く
     
-    // 各行に関数を設定（メンバー一覧をベースに）
+    // セル単位の通信を避け、全員分の数式を一括で設定する。
+    const formulaRows = [];
     for (let row = 2; row <= maxRows + 1; row++) {
-      const memberRowIndex = row - 1; // メンバー一覧の行インデックス（ヘッダー行を含む）
+      const memberRowIndex = row; // 両シートとも1行目はヘッダー。
       
       // A列（組）: メンバー一覧シートから直接取得
       const classFormula = `=IFERROR('${memberSheetName}'!A${memberRowIndex}, "")`;
-      summarySheet.getRange(row, 1).setFormula(classFormula);
       
       // B列（番号）: メンバー一覧シートから直接取得
       const numberFormula = `=IFERROR('${memberSheetName}'!B${memberRowIndex}, "")`;
-      summarySheet.getRange(row, 2).setFormula(numberFormula);
       
       // C列（名前）: メンバー一覧シートから直接取得
       const nameFormula = `=IFERROR('${memberSheetName}'!C${memberRowIndex}, "")`;
-      summarySheet.getRange(row, 3).setFormula(nameFormula);
+      const formulas = [classFormula, numberFormula, nameFormula];
       
       // 組・番号の参照（履歴ログのH列とI列で一致するものを検索）
       const classRef = `A${row}`; // メンバー一覧の組
       const numberRef = `B${row}`; // メンバー一覧の番号
       
       // D列以降（各分野ごとの統計）
-      let colIndex = 4;
       eraList.forEach(era => {
         // 最高得点: ARRAYFORMULA関数とMAX関数で正解率（D列）の最大値を取得
         // 組（H列）と番号（I列）が一致するものを検索
         // 正解率は%表記なので、数値に変換してから比較
         const maxFormula = `=IF(OR(A${row}="", B${row}=""), "", IFERROR(MAX(ARRAYFORMULA(IF('${historySheetName}'!B:B="${era}", IF('${historySheetName}'!H:H=${classRef}, IF('${historySheetName}'!I:I=${numberRef}, VALUE(SUBSTITUTE(SUBSTITUTE('${historySheetName}'!D:D, "%", ""), ",", ""))))))), ""))`;
-        summarySheet.getRange(row, colIndex).setFormula(maxFormula);
-        summarySheet.getRange(row, colIndex).setNumberFormat('#,##0');
-        colIndex++;
         
         // 取り組み回数: COUNTIFS関数
         // 組（H列）と番号（I列）が一致するものを検索
         const countFormula = `=IF(OR(A${row}="", B${row}=""), "", COUNTIFS('${historySheetName}'!B:B, "${era}", '${historySheetName}'!H:H, ${classRef}, '${historySheetName}'!I:I, ${numberRef}))`;
-        summarySheet.getRange(row, colIndex).setFormula(countFormula);
-        summarySheet.getRange(row, colIndex).setNumberFormat('#,##0');
-        colIndex++;
         
         // 平均点: ARRAYFORMULA関数とAVERAGE関数を組み合わせ
         // 組（H列）と番号（I列）が一致するものを検索
         const avgFormula = `=IF(OR(A${row}="", B${row}=""), "", IFERROR(AVERAGE(ARRAYFORMULA(IF('${historySheetName}'!B:B="${era}", IF('${historySheetName}'!H:H=${classRef}, IF('${historySheetName}'!I:I=${numberRef}, VALUE(SUBSTITUTE(SUBSTITUTE('${historySheetName}'!D:D, "%", ""), ",", ""))))))), ""))`;
-        summarySheet.getRange(row, colIndex).setFormula(avgFormula);
-        summarySheet.getRange(row, colIndex).setNumberFormat('#,##0');
-        colIndex++;
+        formulas.push(maxFormula, countFormula, avgFormula);
       });
+      formulaRows.push(formulas);
+    }
+    if (formulaRows.length > 0) {
+      summarySheet.getRange(2, 1, formulaRows.length, headers.length).setFormulas(formulaRows);
+    }
+    const dataRowCount = summarySheet.getMaxRows() - 1;
+    if (dataRowCount > 0) {
+      summarySheet.getRange(2, 1, dataRowCount, 3).setNumberFormat('@');
+      if (headers.length > 3) {
+        summarySheet.getRange(2, 4, dataRowCount, headers.length - 3).setNumberFormat('#,##0');
+      }
     }
     
     // 列幅を自動調整
