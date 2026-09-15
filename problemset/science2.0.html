@@ -2969,7 +2969,7 @@
             explanationEl.innerHTML = renderContentWithImages(q.explanation);
             let aiHost = getEl('ai-tutor-host');
             if (!aiHost) { aiHost = document.createElement('div'); aiHost.id = 'ai-tutor-host'; explanationEl.after(aiHost); }
-            try { window.M2AiTutor?.mount(aiHost, q, selected); } catch (error) { console.warn('AI panel unavailable', error); }
+            try { window.M2AiTutor?.mount(aiHost, q, selected, USER_NAME); } catch (error) { console.warn('Explanation panel unavailable', error); }
             // 解説でも数式をレンダリング（DOM更新後に実行）
             setTimeout(() => renderMath(explanationEl), 100);
             getEl('result-badge').innerText = isCorrect ? 'CORRECT' : 'INCORRECT'; 
