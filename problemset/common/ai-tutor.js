@@ -1,8 +1,9 @@
 /* Shared science AI endpoint. Never put API credentials in this file. */
 (() => {
     'use strict';
-    const ENDPOINT = 'https://script.google.com/macros/s/AKfycbx8mgOG9OxTVGs9L9wRh_PF72lqRGsdFJzyqtpSzKtYETQqQ-ifGaNBgdB5RzmEiW6C/exec';
+    const ENDPOINT = 'https://script.google.com/macros/s/AKfycbz5_9rk7Qheyi9wHyiplQYyMNxeHBrOkfJfYDc3m5K0XwGyr1XAGLx8PRXdMCvfU5QAqA/exec';
     const APP_ID = 'm2'; // Registered server-side profile; H2 integration uses 'h2'.
+    const SESSION_TTL_MS = 2 * 60 * 60 * 1000;
     let session = null;
     let dispose = () => {};
     let uncertain = false;
@@ -13,9 +14,10 @@
         material_source_error: 'この教材はAI解説の対象外、または取得できません。先生に確認してください。',
         app_mismatch: 'AI解説の接続設定が一致しません。先生に確認してください。',
         usage_limit: 'AI解説の利用上限に達しました。', daily_limit: '本日のAI解説は上限に達しました。',
-        session_limit: '現在、新しいAI解説を開始できません。', session_expired: 'AI解説の有効時間が切れました。',
+        session_limit: '現在、新しいAI解説を開始できません。', session_expired: 'AI解説の有効時間が切れました。もう一度操作すると新しいセッションで開始します。',
         request_busy: '別のAI解説を処理中です。', request_pending: '前の質問を処理中です。',
         connection_failed: '通信に失敗しました。自動再送はしません。利用回数が消費されている場合があります。',
+        invalid_response: 'AIから正常な応答を受け取れませんでした。重複送信を防ぐため、追加送信を停止しました。',
         insufficient_quota: 'AIサービスの利用枠が不足しています。', rate_limit_exceeded: 'AIサービスが混雑しています。'
     };
     const el = (tag, text, parent) => {
@@ -36,7 +38,8 @@
         let controller = null;
         let busy = false;
         let answerInFlight = false;
-        dispose = () => { alive = false; if (answerInFlight) uncertain = true; controller?.abort(); host.replaceChildren(); };
+        let expiryTimer = null;
+        dispose = () => { alive = false; clearTimeout(expiryTimer); if (answerInFlight) uncertain = true; controller?.abort(); host.replaceChildren(); };
         const root = el('details', undefined, host);
         root.className = 'm2-ai';
         el('summary', 'AI解説を見る', root);
@@ -60,7 +63,15 @@
         status.setAttribute('role','status'); status.setAttribute('aria-live','polite');
         const count = el('p', undefined, body); count.className = 'm2-ai-notice';
         for (const button of [difference,simple]) button.type = 'button';
+        function expireSession() {
+            session = null; usage.clear(); history.replaceChildren();
+            status.textContent = messages.session_expired;
+        }
         function refresh() {
+            if (!alive) return;
+            clearTimeout(expiryTimer);
+            if (!busy && !uncertain && session && Date.now() >= session.expiresAt) expireSession();
+            if (!busy && session && !uncertain) expiryTimer = setTimeout(refresh, Math.max(1, session.expiresAt - Date.now()));
             const used = usage.get(q.id) || 0;
             const limited = used >= 3 || (session?.used || 0) >= 20;
             for (const button of [difference,simple,send]) button.disabled = busy || uncertain || limited || !ENDPOINT;
@@ -74,20 +85,25 @@
             try {
                 const response = await fetch(ENDPOINT, {method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(payload),signal:controller.signal,credentials:'omit',redirect:'follow'});
                 if (!response.ok) throw new Error('connection_failed');
-                return await response.json();
+                let result;
+                try { result = await response.json(); } catch (_) { throw new Error('invalid_response'); }
+                if (!result || typeof result !== 'object' || Array.isArray(result)) throw new Error('invalid_response');
+                return result;
             } finally { clearTimeout(timer); }
         }
         async function ask(action, text = '') {
+            refresh();
             if (busy || uncertain || !ENDPOINT) return;
             busy = true; status.textContent = '考えています…'; refresh();
             let answerStarted = false;
             try {
                 if (!session) {
+                    const startedAt = Date.now();
                     const result = await post({operation:'session',appId:APP_ID});
                     if (!alive) return;
                     if (result.error) throw new Error(result.error);
                     if (result.bankVersion !== 'science-sheets-v2' || result.appId !== APP_ID || typeof result.token !== 'string') throw new Error('material_mismatch');
-                    session = {...result,used:0};
+                    session = {...result,used:0,expiresAt:startedAt + SESSION_TTL_MS};
                 }
                 const sign = await signature(q);
                 if (!alive) return;
@@ -111,8 +127,11 @@
                 if (action === 'question') input.value = '';
             } catch (error) {
                 const code = error.name === 'AbortError' || error instanceof TypeError ? 'connection_failed' : error.message;
-                if (alive && answerStarted && ['connection_failed','invalid_response'].includes(code)) uncertain = true;
-                if (alive) status.textContent = messages[code] || 'AI解説を取得できませんでした。自動再送はしません。';
+                if (alive && answerStarted && ['connection_failed','invalid_response','app_mismatch'].includes(code)) uncertain = true;
+                if (alive && code === 'session_expired') expireSession();
+                if (alive) status.textContent = code === 'invalid_response' && !answerStarted
+                    ? 'AI解説の接続を開始できませんでした。自動再送はしません。'
+                    : messages[code] || 'AI解説を取得できませんでした。自動再送はしません。';
             } finally { busy = false; answerInFlight = false; if (alive) refresh(); }
         }
         difference.onclick = () => ask('difference');
