@@ -11,6 +11,7 @@ SCIENCE ULTRA プロキシ V9.8 (v2.7) - 科学版
 function doGet(e) {
 try {
 const action = e.parameter.action;
+if (action === 'getHistoryReview') return handleHistoryReview(e.parameter);
 if (action === 'logAll') return handleLogAll(e.parameter);
 if (action === 'logQuit') return handleLogQuit(e.parameter);
 if (action === 'updateStatus') return handleUpdateStatus(e.parameter);
@@ -70,10 +71,33 @@ function normalizeEraNameForSeason(value) {
 
 function parseSeasonUnitKey(value) {
   const normalized = normalizeEraNameForSeason(value);
-  const match = normalized.match(/^1\s*-\s*(\d+)/);
+  // M2の「1-0」とH2の「01」の両方を、シーズン規則の比較用数値へ正規化する。
+  const match = normalized.match(/^(\d+)(?:\s*-\s*(\d+))?/);
   if (!match) return null;
-  const unitNumber = Number(match[1]);
+  const unitNumber = Number(match[2] || match[1]);
   return isNaN(unitNumber) ? null : unitNumber;
+}
+
+function isH2ProblemsetProfile(runtimeConfig) {
+  const config = runtimeConfig || {};
+  const activeSeasonId = String(config.activeSeasonId || '').trim();
+  const appUrl = String(config.appUrl || '').trim();
+  const seasonRules = JSON.stringify(config.seasonRules || []);
+  return activeSeasonId.indexOf('R8-H2-') === 0 ||
+    appUrl.indexOf('/R8H2/') >= 0 ||
+    seasonRules.indexOf('R8-H2-') >= 0;
+}
+
+function getSystemSheetNames(runtimeConfig) {
+  const names = ["履歴ログ", "詳細履歴ログ", "問題別統計DB", "成績一覧", "メンバー一覧", "設定", "画像管理", "中断ログ", "管理操作", "管理ログ"];
+  if (!isH2ProblemsetProfile(runtimeConfig)) {
+    names.push("記述問題", "記述履歴ログ");
+  }
+  return names;
+}
+
+function getMemberSampleClass(ss) {
+  return isH2ProblemsetProfile(readRuntimeConfigFromSheet(ss)) ? 'A' : '菊';
 }
 
 function parseSeasonRules(value) {
@@ -260,6 +284,33 @@ if (raw === '' || raw === null || raw === undefined) return true;
 const s = String(raw).trim().toLowerCase();
 if (["0", "false", "off", "no", "n", "無効", "invalid"].indexOf(s) >= 0) return false;
 return true;
+}
+
+function handleHistoryReview(p) {
+  try {
+    if (!p.id || !p.userId || !p.timestamp) throw new Error('履歴の指定が不足しています。');
+    const ss = SpreadsheetApp.openById(p.id);
+    const history = ss.getSheetByName('履歴ログ');
+    const details = ss.getSheetByName('詳細履歴ログ');
+    if (!history || !details) throw new Error('詳細履歴がありません。');
+    const timestamp = Number(p.timestamp);
+    const rows = history.getDataRange().getValues().slice(1);
+    // 同一秒の記録を推測で結び付けない。無効化済み記録も照合の曖昧さに含める。
+    const matches = rows.filter(r => String(r[6]) === String(p.userId) && parseTimestampSafe(r[0]) === timestamp);
+    if (matches.length !== 1 || !isHistoryRowEnabled(matches[0])) throw new Error('この回の詳細履歴を一意に確認できません。');
+    const row = matches[0];
+    if (String(row[1]) !== String(p.era) || String(row[2]) !== String(p.range)) throw new Error('履歴の内容が更新されています。再同期してください。');
+    const items = details.getDataRange().getValues().slice(1)
+      .filter(r => String(r[6]) === String(p.userId) && parseTimestampSafe(r[0]) === timestamp)
+      .map(r => ({ era: String(r[1]), number: Number(r[2]) + 1, result: String(r[4]) }));
+    const count = Number(String(row[4]).split('/')[1]);
+    if (!items.length || items.length !== count || items.some(q => !Number.isInteger(q.number) || q.number < 1)) {
+      throw new Error('問題ごとの記録が不足しているため、この回は表示できません。');
+    }
+    return returnJson({ status: 'success', items: items });
+  } catch (err) {
+    return returnJson({ status: 'error', message: err.message || String(err) });
+  }
 }
 
 function parseTimestampSafe(value) {
@@ -633,7 +684,7 @@ result.lifetimeSummary = {
 result.imageMap = readImageMapFromSheet(ss);
 
 // システム用シートを除外するリスト
-const excludeSheets = ["履歴ログ", "詳細履歴ログ", "問題別統計DB", "成績一覧", "メンバー一覧", "設定", "画像管理", "中断ログ", "管理操作", "管理ログ", "記述問題", "記述履歴ログ"];
+const excludeSheets = getSystemSheetNames(runtimeConfig);
 const excludeSheetAliases = ["config", "settings", "_config", "_settings"];
 const normalizeSheetName = (name) => String(name || '').replace(/\u3000/g, ' ').trim();
 const hiddenProblemSheetSet = {};
@@ -1205,7 +1256,7 @@ function parseUserIdParts(userId) {
 }
 
 function listProblemSheetStatus(ss, runtimeConfig) {
-  const systemSheets = ["履歴ログ", "詳細履歴ログ", "問題別統計DB", "成績一覧", "メンバー一覧", "設定", "画像管理", "中断ログ", "管理操作", "管理ログ", "記述問題", "記述履歴ログ"];
+  const systemSheets = getSystemSheetNames(runtimeConfig);
   const systemAliases = ["config", "settings", "_config", "_settings"];
   const normalize = function(name) { return String(name || '').replace(/\u3000/g, ' ').trim(); };
   const hiddenSet = {};
@@ -1765,7 +1816,7 @@ function updateOverallSummarySheet(ss) {
         .setHorizontalAlignment("center");
       memberSheet.setFrozenRows(1);
       // サンプル行を追加（削除可能）
-      memberSheet.getRange(2, 1, 1, 3).setValues([["菊", "1", "サンプル"]]);
+      memberSheet.getRange(2, 1, 1, 3).setValues([[getMemberSampleClass(ss), "1", "サンプル"]]);
     }
     
     // 成績一覧シートを作成/取得

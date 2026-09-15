@@ -314,6 +314,10 @@
     <!-- メイン -->
     <div id="app" class="max-w-4xl xl:max-w-[1450px] mx-auto w-full flex-grow px-3 py-3 md:p-8 flex flex-col">
         <div id="home-screen" class="fade-in">
+            <details class="my-4 border-y border-white/20 py-3">
+                <summary class="cursor-pointer font-bold">過去の取り組み</summary>
+                <div id="history-review-list" class="text-sm"></div>
+            </details>
             <!-- ヘッダーエリア -->
             <div class="text-center md:text-left space-y-2 mb-0 pb-0">
                 <h1 class="text-3xl md:text-6xl font-header tracking-tighter text-white whitespace-nowrap">SCIENCE <span id="app-version-display" class="font-flashy text-2xl md:text-4xl" style="color: var(--accent-primary)">2026 ULTRA Master <span class="text-[0.4em] md:text-[0.7em] opacity-70 font-normal">for 102th</span></span></h1>
@@ -595,6 +599,9 @@
 
     <!-- 共通設定・共通関数 -->
     <script src="./common/science-shared.js"></script>
+    <script src="./common/history-review.js"></script>
+    <link rel="stylesheet" href="./common/ai-tutor.css">
+    <script src="./common/ai-tutor.js"></script>
     <!-- スクリプト部分は以前のものを継続して使用 -->
     <script>
         const SHARED = window.ScienceShared || {};
@@ -1538,6 +1545,7 @@
         
         window.logoutUser = async () => {
             if (!confirm('ログアウトしますか？')) return;
+            window.M2AiTutor?.logout();
             USER_NAME = '';
             USER_CLASS = '';
             USER_NUMBER = '';
@@ -1628,6 +1636,22 @@
             }
             return `${baseUserId}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
         }
+
+        window.historyReviewPanel = window.HistoryReview.mount(document.getElementById('history-review-list'), () => ({
+            userId: `${USER_CLASS}-${USER_NUMBER}-${USER_NAME}`,
+            history: cumulativeHistory, questions: masterDataTotal, images: imageMapById, math: renderMath,
+            load: async entry => {
+                const spreadsheetUrl = getEl('main-spreadsheet-url')?.value || FIXED_SPREADSHEET_URL;
+                const id = spreadsheetUrl.match(/\/d\/([a-zA-Z0-9-_]+)/)?.[1];
+                if (!id) throw new Error('スプレッドシートを確認してください。');
+                const response = await fetch(`${FIXED_GAS_URL}?${new URLSearchParams({
+                    action: 'getHistoryReview', id, userId: `${USER_CLASS}-${USER_NUMBER}-${USER_NAME}`,
+                    timestamp: String(entry.timestamp), era: entry.summaryEra, range: entry.summaryRange
+                })}`, { signal: AbortSignal.timeout(30000) });
+                if (!response.ok) throw new Error('履歴を取得できませんでした。');
+                return response.json();
+            }
+        }));
 
         function buildSessionDetails(limit = quizData.length) {
             return quizData.slice(0, limit).map((q, idx) => ({
@@ -1951,6 +1975,7 @@
         }
 
         function updateStatsUI() {
+            if (window.historyReviewPanel) window.historyReviewPanel.refresh();
             try {
                 const sorted = [...userHistory].sort((a,b) => b.timestamp - a.timestamp);
                 const latest = sorted[0];
@@ -2767,6 +2792,7 @@
         }
 
         function showQuestionRecovery(error) {
+            window.M2AiTutor?.reset();
             console.error('[question-flow] question display failed', {
                 currentIdx,
                 questionId: quizData[currentIdx]?.id || null,
@@ -2798,6 +2824,7 @@
         }
 
         function showQuestion() {
+            window.M2AiTutor?.reset();
             try {
                 const q = quizData[currentIdx];
                 if (!isQuestionRenderable(q)) throw new Error('問題データが不完全です');
@@ -2940,6 +2967,9 @@
             getEl('feedback-area').classList.remove('hidden'); 
             const explanationEl = getEl('explanation-content');
             explanationEl.innerHTML = renderContentWithImages(q.explanation);
+            let aiHost = getEl('ai-tutor-host');
+            if (!aiHost) { aiHost = document.createElement('div'); aiHost.id = 'ai-tutor-host'; explanationEl.after(aiHost); }
+            try { window.M2AiTutor?.mount(aiHost, q, selected); } catch (error) { console.warn('AI panel unavailable', error); }
             // 解説でも数式をレンダリング（DOM更新後に実行）
             setTimeout(() => renderMath(explanationEl), 100);
             getEl('result-badge').innerText = isCorrect ? 'CORRECT' : 'INCORRECT'; 
@@ -3053,6 +3083,7 @@
                 nextButton.setAttribute('aria-disabled', 'true');
             }
             getEl('quiz-screen')?.classList.add('hidden');
+            window.M2AiTutor?.reset();
             getEl('result-screen')?.classList.remove('hidden');
             if (lvUpMsg) lvUpMsg.classList.add('hidden');
             if (expNoteEl) expNoteEl.innerText = '';
@@ -3130,7 +3161,7 @@
 
         window.recoverQuestionProgress = () => advanceFromAnsweredQuestion({ recovery: true });
 
-        window.showHome = () => { isQuestionTransitioning = false; getEl('quiz-screen').classList.add('hidden'); getEl('result-screen').classList.add('hidden'); getEl('home-screen').classList.remove('hidden'); updateStatsUI(); window.renderEraMenu(); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+        window.showHome = () => { window.M2AiTutor?.reset(); isQuestionTransitioning = false; getEl('quiz-screen').classList.add('hidden'); getEl('result-screen').classList.add('hidden'); getEl('home-screen').classList.remove('hidden'); updateStatsUI(); window.renderEraMenu(); window.scrollTo({ top: 0, behavior: 'smooth' }); };
         
         window.abortQuiz = async () => {
             if (isSessionFinalizing) return;
