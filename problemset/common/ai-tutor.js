@@ -59,7 +59,6 @@
         const body = el('div', undefined, root);
         body.className = 'm2-ai-body';
         el('p', '解説には誤りが含まれることがあります。疑問が残る場合は先生に確認してください。', body).className = 'm2-ai-notice';
-        el('p', '利用日時・登録したユーザー名・問題・質問・解答は先生が確認できる記録に保存されます。質問には個人情報を入力しないでください。', body).className = 'm2-ai-notice';
         const levels = el('fieldset', undefined, body);
         levels.className = 'm2-ai-levels';
         el('legend', '解説レベル', levels);
