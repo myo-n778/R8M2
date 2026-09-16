@@ -598,14 +598,14 @@
     </footer>
 
     <!-- 共通設定・共通関数 -->
-    <script src="./common/science-shared.js"></script>
+    <script src="./common/science-shared.js?v=20260916-routing"></script>
     <script src="./common/history-review.js"></script>
     <link rel="stylesheet" href="./common/ai-tutor.css">
-    <script src="./common/ai-tutor.js"></script>
+    <script src="./common/ai-tutor.js?v=20260916-routing"></script>
     <!-- スクリプト部分は以前のものを継続して使用 -->
     <script>
         const SHARED = window.ScienceShared || {};
-        const FIXED_GAS_URL = SHARED.gasUrl || "https://script.google.com/macros/s/AKfycbwqdkDmwOYt7g1jB7vdjK8JNuBdBxrQyEe8YwKxSpASYn8Q5i36178xZzSA72JE8AJZ/exec";
+        const FIXED_GAS_URL = SHARED.gasUrl || "";
         const FIXED_SPREADSHEET_URL = "https://docs.google.com/spreadsheets/d/1LCGCVjeiTicyclXFTP0EaxxB_RluZJrveWPo1FdLzsk/edit";
         const IMAGE_MAP_URL = "./data/image-map.json";
         const normalizeUserName = SHARED.normalizeUserName || ((name) => name ? name.normalize('NFKC').trim() : '');
@@ -1304,7 +1304,7 @@
                 }
                 
                 diagnostic.success = true;
-                console.log('✅ 同期成功');
+                console.log('JSON応答を受信（同期内容は未検証）');
                 console.groupEnd();
                 return jsonData;
                 
@@ -3209,7 +3209,15 @@
                     userId: userId || '(未設定)'
                 });
                 
-                const result = await fetchWithRetry(syncUrl); 
+                const result = await fetchWithRetry(syncUrl, {}, 0);
+                // Validate the sync contract before mutating cached questions or displayed scores.
+                if (!result || typeof result !== 'object' || Array.isArray(result) ||
+                    result.service === 'science-ai' || !result.problems ||
+                    typeof result.problems !== 'object' || Array.isArray(result.problems) ||
+                    !Object.values(result.problems).every(value => typeof value === 'string')) {
+                    showModal('同期エラー', '教材データを取得できませんでした。接続先の応答が問題集用の形式ではありません。先生にお知らせください。保存済みの問題・成績は変更していません。');
+                    return;
+                }
                 console.log('同期結果全体:', result);
                 console.log('resultの全キー:', Object.keys(result));
                 

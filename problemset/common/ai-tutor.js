@@ -1,7 +1,7 @@
 /* Shared science AI endpoint. Never put API credentials in this file. */
 (() => {
     'use strict';
-    const ENDPOINT = 'https://script.google.com/macros/s/AKfycby0d8ZZPaDhkr4spGSIBtzZTomqMoGvqb-voBoc81_Of3C7Dta0aT9_y2bPMD2hud_egA/exec';
+    const ENDPOINT = 'https://script.google.com/macros/s/AKfycbyyVleb21JwAI9LdMR4fWVzHl_ZAa22JjIWM6PmLpzvJWW5c1oVxPtl54zSgDrl5yH-QA/exec';
     const APP_ID = 'm2'; // Registered server-side profile; H2 integration uses 'h2'.
     const SESSION_TTL_MS = 2 * 60 * 60 * 1000;
     const LEVELS = {junior:'中学生',high:'高校生',advanced:'ハイレベル'};
