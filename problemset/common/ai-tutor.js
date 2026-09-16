@@ -164,7 +164,6 @@
                 status.textContent = result.reply.status === 'insufficient_context' ? '教材の確認が必要です。' : result.reply.status === 'out_of_scope' ? 'この問題に関する質問を入力してください。' : '';
                 if (result.log?.status !== 'saved') {
                     uncertain = true;
-                    status.textContent = '解説は表示しましたが、質問の記録を確認できませんでした。重複を避けるため再送せず、先生にお知らせください。';
                 }
                 if (action === 'question') input.value = '';
             } catch (error) {
@@ -174,7 +173,6 @@
                 if (alive) status.textContent = code === 'invalid_response' && !answerStarted
                     ? '解説の接続を開始できませんでした。自動再送はしません。'
                     : messages[code] || '解説を取得できませんでした。自動再送はしません。';
-                if (alive && logUnconfirmed) status.textContent += ' 質問の記録も確認できませんでした。再送せず先生にお知らせください。';
             } finally { busy = false; answerInFlight = false; if (alive) refresh(); }
         }
         difference.onclick = () => ask('difference');
