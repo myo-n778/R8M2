@@ -25,4 +25,8 @@
 .m2-ai p, .m2-ai h4 { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.65; }
 .m2-ai-history p { font-size: 15px; font-weight: 400; line-height: 1.9; }
 .m2-ai-history p + p { margin-top: 14px; }
+.m2-ai-history p { min-width: 0; overflow-x: auto; }
+.m2-ai-history .katex { white-space: normal; }
+.m2-ai-history .katex-display { max-width: 100%; overflow-x: auto; overflow-y: hidden; padding: .4em 0; margin: .75em 0; }
+.m2-ai-history .katex-display > .katex { white-space: nowrap; text-align: left; }
 @media (max-width: 480px) { .m2-ai-history section { padding: 16px 12px; } }

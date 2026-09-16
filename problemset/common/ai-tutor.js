@@ -161,6 +161,8 @@
                 el('p', LEVELS[requestedLevel], entry).className = 'm2-ai-answer-level';
                 el('h4', action === 'question' ? text : action === 'simple' ? 'やさしく説明' : difference.textContent, entry);
                 for (const key of ['conclusion','distinction','checkQuestion']) if (result.reply[key]) el('p',result.reply[key],entry);
+                // Render only this new reply; keep text visible if math assets are unavailable.
+                try { window.renderMath?.(entry); } catch (error) { console.warn('Explanation math unavailable', error); }
                 status.textContent = result.reply.status === 'insufficient_context' ? '教材の確認が必要です。' : result.reply.status === 'out_of_scope' ? 'この問題に関する質問を入力してください。' : '';
                 if (result.log?.status !== 'saved') {
                     uncertain = true;
