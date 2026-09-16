@@ -2443,17 +2443,9 @@
 
         window.renderEraMenu = () => {
             const container = getEl('era-menu-container'); if(!container) return;
-            let rawData = localStorage.getItem('ethics_data_main');
+            let rawData = localStorage.getItem('r8m2_data_main');
             
-            // 以前の日本史バージョンのデータがある場合は、それも確認
-            if (!rawData || rawData === '{}' || rawData === 'null') {
-                const oldData = localStorage.getItem('nihonshi_tsv_ultra_main');
-                if (oldData) {
-                    console.log('以前の日本史データが見つかりました。移行します...');
-                    localStorage.setItem('ethics_data_main', oldData);
-                    rawData = oldData;
-                }
-            }
+            // Unscoped legacy caches have no reliable subject ownership; leave them untouched.
             
             let storedTSV = {};
             try {
@@ -2526,7 +2518,7 @@
             // スプレッドシートのシート順序を取得（左から右の順序）
             let sheetOrder = [];
             try {
-                const savedSheetOrder = localStorage.getItem('ethics_sheet_order');
+                const savedSheetOrder = localStorage.getItem('r8m2_sheet_order');
                 if (savedSheetOrder) {
                     sheetOrder = JSON.parse(savedSheetOrder);
                     console.log('保存されたシート順序:', sheetOrder);
@@ -3132,7 +3124,7 @@
             });
 
             try {
-                localStorage.setItem('ethics_question_stats', JSON.stringify(questionStats));
+                localStorage.setItem('r8m2_question_stats', JSON.stringify(questionStats));
             } catch (e) {
                 console.error('復習システムの情報の保存に失敗しました:', e);
             }
@@ -3267,18 +3259,18 @@
                 if (result.problems) {
                     // データ構造を確認
                     const cleanedProblems = sanitizeProblemSheets(result.problems);
-                    localStorage.setItem('ethics_data_main', JSON.stringify(cleanedProblems));
-                    console.log('保存後のローカルストレージ:', localStorage.getItem('ethics_data_main')?.substring(0, 200));
+                    localStorage.setItem('r8m2_data_main', JSON.stringify(cleanedProblems));
+                    console.log('保存後のローカルストレージ:', localStorage.getItem('r8m2_data_main')?.substring(0, 200));
                 }
                 if (result.imageMap) {
                     imageMapById = normalizeImageMap(result.imageMap);
-                    localStorage.setItem('ethics_image_map', JSON.stringify(result.imageMap));
+                    localStorage.setItem('r8m2_image_map', JSON.stringify(result.imageMap));
                     console.log('画像対応表:', Object.keys(imageMapById).length);
                 }
                 // シートの順序を保存（スプレッドシートの左から右の順序）
                 if(result.sheetOrder && result.sheetOrder.length > 0) {
                     const cleanedSheetOrder = sanitizeSheetOrder(result.sheetOrder);
-                    localStorage.setItem('ethics_sheet_order', JSON.stringify(cleanedSheetOrder));
+                    localStorage.setItem('r8m2_sheet_order', JSON.stringify(cleanedSheetOrder));
                     console.log('シートの順序:', cleanedSheetOrder);
                 }
                 if(result.userStats) { 
@@ -3360,7 +3352,7 @@
             
             // 復習システムの情報をローカルストレージから読み込む
             try {
-                const savedStats = localStorage.getItem('ethics_question_stats');
+                const savedStats = localStorage.getItem('r8m2_question_stats');
                 if (savedStats) {
                     const parsed = JSON.parse(savedStats);
                     // 既存のquestionStatsとマージ（復習システムの情報を追加）
