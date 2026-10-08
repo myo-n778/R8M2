@@ -598,7 +598,7 @@
     </footer>
 
     <!-- 共通設定・共通関数 -->
-    <script src="./common/science-shared.js?v=20260916-routing"></script>
+    <script src="./common/science-shared.js?v=20261009-seasons"></script>
     <script src="./common/history-review.js"></script>
     <link rel="stylesheet" href="./common/ai-tutor.css">
     <script src="./common/ai-tutor.js?v=20260916-routing"></script>
@@ -2441,6 +2441,8 @@
             return problems;
         }
 
+        const librarySeasonOpen = new Map();
+        let librarySeasonSignature = '';
         window.renderEraMenu = () => {
             const container = getEl('era-menu-container'); if(!container) return;
             let rawData = localStorage.getItem('r8m2_data_main');
@@ -2543,6 +2545,33 @@
             console.log('表示するカテゴリ順序:', categories);
             
             const eraSessionStats = buildEraSessionStats(userHistory);
+            const seasonParents = new Map();
+            if (!isWeakPointsMode) {
+                const groups = SHARED.groupErasBySeason?.(categories, runtimeConfigState);
+                const active = String(runtimeConfigState?.activeSeasonId || '').trim();
+                const signature = JSON.stringify([active, runtimeConfigState?.seasonRules]);
+                if (signature !== librarySeasonSignature) {
+                    librarySeasonOpen.clear();
+                    librarySeasonSignature = signature;
+                }
+                (groups || []).forEach(group => {
+                    const section = document.createElement('details');
+                    section.className = 'library-season';
+                    section.style.cssText = 'border-bottom:1px solid rgba(148,163,184,.25);padding:8px 0;';
+                    section.dataset.season = group.id;
+                    section.open = librarySeasonOpen.has(group.id) ? librarySeasonOpen.get(group.id) : !group.id || group.id === active;
+                    const heading = document.createElement('summary');
+                    heading.style.cssText = 'cursor:pointer;font-size:14px;font-weight:700;padding:10px 4px;overflow-wrap:anywhere;';
+                    heading.textContent = `${group.id || 'その他'}${group.id === active && active ? '（今期）' : ''} · ${group.categories.length}単元`;
+                    section.appendChild(heading);
+                    section.addEventListener('toggle', () => {
+                        librarySeasonOpen.set(group.id, section.open);
+                        window.updateEraMenuScrollHint?.();
+                    });
+                    container.appendChild(section);
+                    group.categories.forEach(name => seasonParents.set(name, section));
+                });
+            }
             
             // 各分野（シート名）を表示
             categories.forEach((categoryName) => {
@@ -2573,7 +2602,7 @@
                     startQuiz();
                 };
                 
-                container.appendChild(eHeader);
+                (seasonParents.get(categoryName) || container).appendChild(eHeader);
             });
             setTimeout(window.updateEraMenuScrollHint, 0);
             

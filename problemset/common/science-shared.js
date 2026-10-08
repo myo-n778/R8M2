@@ -28,10 +28,37 @@
     return stats;
   }
 
+  function groupErasBySeason(categories, config) {
+    if (!config || !Array.isArray(config.seasonRules) || !config.seasonRules.length) return null;
+    const unit = value => {
+      const match = String(value || '').normalize('NFKC').trim().replace(/[−－ー―]/g, '-').match(/^(\d+)(?:\s*-\s*(\d+))?/);
+      return match ? [Number(match[1]), Number(match[2] || 0)] : null;
+    };
+    const compare = (a, b) => a[0] - b[0] || a[1] - b[1];
+    const groups = new Map();
+    categories.forEach(name => {
+      const key = unit(name);
+      const rule = config.seasonRules.find(rule => {
+        const start = unit(rule.start), end = unit(rule.end);
+        return key && start && compare(key, start) >= 0 && (!end || compare(key, end) <= 0);
+      });
+      const id = rule ? String(rule.seasonId || '').trim() : '';
+      if (!groups.has(id)) groups.set(id, {id, categories: []});
+      groups.get(id).categories.push(name);
+    });
+    const active = String(config.activeSeasonId || '').trim();
+    const order = [...new Set(config.seasonRules.map(rule => String(rule.seasonId || '').trim()))].reverse();
+    return [...groups.values()].sort((a, b) => {
+      const rank = id => id === active && id ? -1 : !id ? order.length : order.indexOf(id);
+      return rank(a.id) - rank(b.id);
+    });
+  }
+
   window.ScienceShared = {
     gasUrl: "https://script.google.com/macros/s/AKfycbwcBaf_43QzTh2RJm9SOsOyPMYYw7tpct-bc0tGPVjpPaa_FPWSp7A8ts7qony3znCG7w/exec",
     normalizeUserName: normalizeUserName,
     formatDateYmd: formatDateYmd,
-    buildEraSessionStats: buildEraSessionStats
+    buildEraSessionStats: buildEraSessionStats,
+    groupErasBySeason: groupErasBySeason
   };
 })();
