@@ -150,6 +150,11 @@
             scrollbar-width: thin;
             scrollbar-color: #64748b transparent;
         }
+        @media (min-width: 1024px) {
+            #session-library { align-self: stretch; contain: size; min-height: 0; }
+            #session-library > .relative { flex: 1; }
+            #era-menu-container { position: absolute; inset: 0; max-height: none; }
+        }
         
         .neural-level-badge { background: linear-gradient(135deg, var(--accent-primary), #a855f7); color: white; padding: 2px 10px; border-radius: 4px; font-family: 'Orbitron', sans-serif; font-size: 10px; font-weight: 900; }
         .ranking-card { 
