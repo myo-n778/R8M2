@@ -265,6 +265,9 @@
             }
         }
     </style>
+    <script src="../quiz-feedback.js"></script>
+    <script src="../quiz-explanation.js"></script>
+    <style>[data-explanation-panel][hidden] { display: none !important; }</style>
 </head>
 <body class="min-h-screen flex flex-col">
 
@@ -368,7 +371,7 @@
                 <div class="lg:col-span-2 xl:col-span-1 space-y-4">
                     <div class="glass-panel rounded-[1.5rem] md:rounded-[2.5rem] p-5 md:p-8 space-y-4">
                         <div class="flex justify-between items-center">
-                            <h2 class="text-[10px] font-black uppercase flex items-center gap-2" style="color: var(--accent-primary)"><i class="fas fa-chart-area"></i> Neural Performance</h2>
+                            <h2 class="text-[10px] font-black uppercase flex items-center gap-2" style="color: var(--accent-primary)"><i class="fas fa-chart-area"></i> 学習記録</h2>
                             <div class="flex gap-2">
                                 <button onclick="window.toggleWeakList()" class="text-[9px] bg-rose-500/20 text-rose-300 px-3 py-1 rounded-full border border-rose-500/30 font-black uppercase"><i class="fas fa-search"></i> Weak Points</button>
                                 <button onclick="window.syncAllFromSpreadsheet(false)" class="text-[9px] bg-white/10 text-white px-3 py-1 rounded-full border border-white/20 font-black uppercase"><i class="fas fa-sync-alt"></i> Sync</button>
@@ -428,8 +431,8 @@
             <div id="sync-area" class="hidden glass-panel rounded-[1.5rem] p-6 border-white/10 space-y-6 fade-in mt-6 md:mt-8">
                 <div class="space-y-4">
                     <div class="flex justify-between items-center">
-                        <h3 class="text-xs font-black text-emerald-400 uppercase italic flex items-center gap-2"><i class="fas fa-palette"></i> Visual Focus Modes</h3>
-                        <span class="text-[8px] text-white/50 uppercase font-black">Scroll to explore</span>
+                        <h3 class="text-xs font-black text-emerald-400 uppercase italic flex items-center gap-2"><i class="fas fa-palette"></i> テーマ</h3>
+
                     </div>
                     <div id="theme-grid" class="grid grid-cols-10 gap-2 max-h-48 overflow-y-auto pr-2"></div>
                 </div>
@@ -543,7 +546,7 @@
                     <div id="result-badge" class="px-5 py-2 rounded-full text-[10px] font-black uppercase w-fit text-white"></div>
                     <div id="voice-message" class="font-flashy text-xl md:text-3xl font-black italic tracking-tight" style="color: var(--accent-primary)"></div>
                 </div>
-                <div class="bg-white/5 rounded-[1.5rem] p-6 border border-white/10 shadow-inner"><div id="explanation-content" class="explanation-card text-slate-300 text-sm md:text-base whitespace-pre-line px-4"></div></div>
+                <div data-explanation-panel class="bg-white/5 rounded-[1.5rem] p-6 border border-white/10 shadow-inner"><div id="explanation-content" class="explanation-card text-slate-300 text-sm md:text-base whitespace-pre-line px-4"></div></div>
                 <button id="next-btn-action" class="w-full bg-white text-slate-900 font-black py-4 rounded-2xl text-lg flex justify-center items-center gap-4 group">PROCEED <i class="fas fa-chevron-right group-hover:translate-x-1 transition-transform"></i></button>
                 <button id="recover-progress-btn" type="button" class="w-full text-slate-300 hover:text-white text-xs font-bold py-2 underline underline-offset-4 transition-colors">進まない場合はここをタップ</button>
             </div>
@@ -1555,7 +1558,7 @@
             }
         };
         
-        window.logoutUser = async () => {
+        window.logoutUser = async () => { QuizFeedback.clear();
             if (!confirm('ログアウトしますか？')) return;
             window.M2AiTutor?.logout();
             USER_NAME = '';
@@ -2370,7 +2373,7 @@
                         tag: "標準", // CSV形式ではタグ情報がないためデフォルト値
                         options: options,
                         answer: answer,
-                        explanation: `正解: ${answer}` // 簡易的な解説
+                        explanation: '' // 解説は未提供。答えを解説として複製しない。
                     });
                 }
             });
@@ -2404,7 +2407,7 @@
                 if (cols.length >= 5) {
                     let qRaw = cols[0].replace(/^[（\(](基礎|標準|応用|発展)[）\)]/, "").trim().replace(/([①②③④])/g, '<br>$1').replace(/^<br>/, '');
                     let tag = cols[0].match(/^[（\(](基礎|標準|応用|発展)[）\)]/)?.[1] || "標準";
-                    let rawExpl = (cols[13] || cols[14] || "詳細解説準備中。");
+                    let rawExpl = (cols[13] || cols[14] || "");
                     problems.push({ 
                         id: `${eraName}-${problems.length + 1}`, 
                         era: eraName, 
@@ -2444,7 +2447,7 @@
                             tag: "標準",
                             options: options.slice(0, 4),
                             answer: answer,
-                            explanation: `正解: ${answer}`
+                            explanation: ''
                         });
                     }
                 }
@@ -2792,7 +2795,7 @@
             return selected.slice(0, 10); // 必ず10問
         };
 
-        async function startQuiz() { 
+        async function startQuiz() { QuizFeedback.clear();
             await loadImageMap();
             currentIdx = 0; score = 0; streak = 0; sessionAnswers = []; 
             isSessionFinalizing = false;
@@ -2857,6 +2860,7 @@
         }
 
         function showQuestion() {
+            QuizFeedback.clear();
             window.M2AiTutor?.reset();
             try {
                 const q = quizData[currentIdx];
@@ -2929,7 +2933,7 @@
 
             canAnswer = false;
             try {
-                const isCorrect = (selected === q.answer); sessionAnswers[currentIdx] = isCorrect;
+                const isCorrect = (selected === q.answer); if (isCorrect) QuizFeedback.correct(); else QuizFeedback.clear(); sessionAnswers[currentIdx] = isCorrect;
             const exist = questionStats[statKey] || { total: 0, correct: 0 }; 
             const today = new Date();
             today.setHours(0, 0, 0, 0);
@@ -2999,9 +3003,9 @@
             } 
             getEl('feedback-area').classList.remove('hidden'); 
             const explanationEl = getEl('explanation-content');
-            explanationEl.innerHTML = renderContentWithImages(q.explanation);
+            QuizExplanation.render(explanationEl, q.explanation, q.answer, renderContentWithImages);
             let aiHost = getEl('ai-tutor-host');
-            if (!aiHost) { aiHost = document.createElement('div'); aiHost.id = 'ai-tutor-host'; explanationEl.after(aiHost); }
+            if (!aiHost) { aiHost = document.createElement('div'); aiHost.id = 'ai-tutor-host'; explanationEl.parentElement.after(aiHost); }
             try { window.M2AiTutor?.mount(aiHost, q, selected, USER_NAME); } catch (error) { console.warn('Explanation panel unavailable', error); }
             // 解説でも数式をレンダリング（DOM更新後に実行）
             setTimeout(() => renderMath(explanationEl), 100);
@@ -3009,6 +3013,7 @@
             getEl('result-badge').className = "px-6 py-2 rounded-full text-[10px] font-black uppercase w-fit " + (isCorrect ? "bg-emerald-500" : "bg-rose-500"); 
                 const voiceList = isCorrect ? praiseWords.perfect : praiseWords.low; getEl('voice-message').innerText = voiceList[Math.floor(Math.random() * voiceList.length)]; setTimeout(() => { getEl('feedback-area').scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 100);
             } catch (error) {
+                QuizFeedback.clear();
                 if (previousStat) questionStats[statKey] = previousStat;
                 else delete questionStats[statKey];
                 score = previousScore;
@@ -3087,7 +3092,7 @@
             }
         }
 
-        function finishSession() {
+        function finishSession() { QuizFeedback.clear();
             // 二重タップだけを止める。古い保存Promiseの有無で結果画面を止めない。
             if (isSessionFinalizing) return;
             isSessionFinalizing = true;
@@ -3194,9 +3199,9 @@
 
         window.recoverQuestionProgress = () => advanceFromAnsweredQuestion({ recovery: true });
 
-        window.showHome = () => { window.M2AiTutor?.reset(); isQuestionTransitioning = false; getEl('quiz-screen').classList.add('hidden'); getEl('result-screen').classList.add('hidden'); getEl('home-screen').classList.remove('hidden'); updateStatsUI(); window.renderEraMenu(); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+        window.showHome = () => { QuizFeedback.clear(); window.M2AiTutor?.reset(); isQuestionTransitioning = false; getEl('quiz-screen').classList.add('hidden'); getEl('result-screen').classList.add('hidden'); getEl('home-screen').classList.remove('hidden'); updateStatsUI(); window.renderEraMenu(); window.scrollTo({ top: 0, behavior: 'smooth' }); };
         
-        window.abortQuiz = async () => {
+        window.abortQuiz = async () => { QuizFeedback.clear();
             if (isSessionFinalizing) return;
             if (confirm('演習を中断しますか？Quit回数として記録します。連続正解は途切れません。')) {
                 isSessionFinalizing = true;
@@ -3491,5 +3496,6 @@
             });
         };
     </script>
+<script>QuizFeedback.mountSoundControl(document.getElementById('quiz-screen') || document.body);</script>
 </body>
 </html>
