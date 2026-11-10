@@ -288,13 +288,12 @@
                 <div class="space-y-2">
                     <label class="text-[10px] text-slate-300 uppercase font-bold block text-left">番号</label>
                     <input id="user-number-input" type="text" class="w-full bg-black border border-indigo-500/50 rounded-xl p-3 text-center text-white outline-none font-bold" placeholder="番号" maxlength="2" pattern="[0-9]*" inputmode="numeric" oninput="this.value = this.value.replace(/[^0-9]/g, '')">
-                    <p class="text-[9px] text-amber-400 italic">菊1〜33・桜1〜34（菊34は教師用）</p>
+                    <p class="text-[9px] text-amber-400 italic">1〜34の半角数字で入力してください。</p>
                 </div>
                 <div class="space-y-2">
                     <label class="text-[10px] text-slate-300 uppercase font-bold block text-left">名前</label>
                     <input id="user-name-input" type="text" class="w-full bg-black border border-indigo-500/50 rounded-xl p-3 text-center text-white outline-none font-bold" placeholder="SCHOLAR NAME">
                 </div>
-                <p id="id-annotation" class="text-[10px] text-cyan-400 italic font-bold">教師用の履歴は、このブラウザー内に保存されます。</p>
             </div>
             <button id="register-btn" class="w-full bg-indigo-600 text-white py-3 rounded-xl font-black uppercase hover:bg-indigo-500 transition-all">Connect to Hub</button>
         </div>
@@ -1417,7 +1416,7 @@
                     }
                 }
             } catch (_) {
-                code102Notice('このブラウザーの教師用履歴を読み込めません。');
+                code102Notice('このブラウザーの履歴を読み込めません。');
             }
             return {userId:prefix, history};
         }
@@ -1456,7 +1455,7 @@
                 if (file.size > 2 * 1024 * 1024) throw new Error('ファイルが大きすぎます。');
                 const data = JSON.parse(await file.text());
                 if (data?.format !== 'r8m2-teacher-history-v1' || !Array.isArray(data.entries) || data.entries.length > 500) {
-                    throw new Error('教師用の履歴ファイルを選択してください。');
+                    throw new Error('対応する履歴ファイルを選択してください。');
                 }
                 if (!isTeacherPreview() || prefix !== teacherHistoryPrefix() ||
                     data.owner?.group !== USER_CLASS || data.owner?.number !== USER_NUMBER ||
@@ -1620,7 +1619,7 @@
 
         function formatUnitLabel(raw) {
             const name = String(raw || '');
-            if (/^(?:\d+-\d+\s*)?生物後半\s*[(（]\s*応用確認\s*[)）]$/.test(name.trim())) return '3-9生物応用';
+            if (/^(?:\d+-\d+\s*)?生物後半\s*[(（]\s*応用確認\s*[)）]$/.test(name.trim())) return '2-9生物応用';
             return name.replace(/[(（]\s*応用確認\s*[)）]/g, '(応用)');
         }
         function initUserInfo() { 
@@ -1647,7 +1646,7 @@
             } 
         }
         function updateUserDisplay() { 
-            if (isTeacherPreview()) code102Notice('教師用の履歴はこのブラウザーだけに保存されます。');
+            if (isTeacherPreview()) code102Notice('履歴はこのブラウザーだけに保存されます。');
             getEl('teacher-history-import-tools').classList.toggle('hidden', !isTeacherPreview());
             getEl('teacher-history-import-status').textContent = '';
             window.historyReviewPanel?.refresh();
@@ -1659,7 +1658,7 @@
                 labelSpan.className = isRankingPublic ? 'text-[7px] text-amber-400/70 font-normal ml-1' : 'text-[7px] text-slate-300/80 font-normal ml-1';
                 labelSpan.textContent = publicLabel;
                 const nameText = USER_NAME ? USER_NAME : '未登録';
-                const labelText = isTeacherPreview() ? '教師用 菊-34 / ' : currentStudentCode() ? `ID ${currentStudentCode()} / ${USER_CLASS}-${USER_NUMBER} ` : '未設定 / ';
+                const labelText = isTeacherPreview() ? '菊-34 / ' : currentStudentCode() ? `ID ${currentStudentCode()} / ${USER_CLASS}-${USER_NUMBER} ` : '未設定 / ';
                 displayEl.textContent = `${labelText}${nameText}`;
                 displayEl.appendChild(labelSpan);
                 // 公開設定に応じてスタイルを変更（光らせる=公開）
@@ -1851,7 +1850,7 @@
             }
             const numberNum = parseInt(numberVal);
             if (isNaN(numberNum) || numberNum < 1 || (!isTeacherPreview(classVal, numberNum) && numberNum > (classVal === '菊' ? 33 : 34))) {
-                showModal("登録エラー", "生徒用は菊1〜33番・桜1〜34番です。菊34番は教師用です。");
+                showModal("登録エラー", "番号は1〜34の半角数字で入力してください。");
                 return;
             }
             
@@ -3386,7 +3385,7 @@
             getEl('result-screen')?.classList.remove('hidden');
             if (lvUpMsg) lvUpMsg.classList.add('hidden');
             if (expNoteEl) expNoteEl.innerText = '';
-            if (saveStatusEl) saveStatusEl.innerText = isTeacherPreview() ? '教師用の履歴を保存しています…' : '成績を記録しています…';
+            if (saveStatusEl) saveStatusEl.innerText = isTeacherPreview() ? '履歴を保存しています…' : '成績を記録しています…';
             if (getEl('final-exp-gained')) getEl('final-exp-gained').innerText = score;
             if (getEl('final-score')) getEl('final-score').innerText = pct;
 
@@ -3414,7 +3413,7 @@
                 const appliedExp = saved ? (Number.isFinite(appliedExpRaw) ? appliedExpRaw : finishedScore) : 0;
                 if (getEl('final-exp-gained')) getEl('final-exp-gained').innerText = appliedExp;
                 if (expNoteEl) expNoteEl.innerText = (logResult && logResult.expReason) ? `※ ${logResult.expReason}` : '';
-                if (saveStatusEl) saveStatusEl.innerText = logResult?.status === 'teacher_history_saved' ? '教師用の履歴をこのブラウザーに保存しました。' : isTeacherPreview() ? 'このブラウザーに履歴を保存できませんでした。' : saved ? '成績を記録しました。' : '成績を記録できませんでした。通信状態を確認してください。';
+                if (saveStatusEl) saveStatusEl.innerText = logResult?.status === 'teacher_history_saved' ? 'このブラウザーに履歴を保存しました。' : isTeacherPreview() ? 'このブラウザーに履歴を保存できませんでした。' : saved ? '成績を記録しました。' : '成績を記録できませんでした。通信状態を確認してください。';
                 const newLv = Math.floor((oldExp + appliedExp) / 10);
                 if (lvUpMsg) {
                     if (newLv > oldLv) lvUpMsg.classList.remove('hidden');
@@ -3571,7 +3570,7 @@
             if (result.identity?.code === currentStudentCode() && Number.isSafeInteger(result.profileRevision)) localStorage.setItem('r8m2_profile_revision_' + currentStudentCode(), String(result.profileRevision));
             try { code102Notice(code102Pending().length ? '保存待ちの回答があります。' : ''); } catch(error) { code102Notice(error.message); }
             try { if (JSON.parse(localStorage.getItem('r8m2_identity_pending_v1') || '[]').length) code102Notice('ID確認待ちの回答を保持しています。'); } catch(error) { code102Notice('ID確認待ちの回答を読み取れません。保存領域は消去しないでください。'); }
-            if (isTeacherPreview()) code102Notice('教師用の履歴はこのブラウザーだけに保存されます。');
+            if (isTeacherPreview()) code102Notice('履歴はこのブラウザーだけに保存されます。');
             else if (!currentStudentCode() && USER_NAME) code102Notice('生徒IDは未設定です。組・番号を確認して登録してください。');
             Object.entries(result.userStats || {}).forEach(([key, s]) => {
                 // A late response must not replace an answer made while the read was pending.
