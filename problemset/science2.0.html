@@ -335,7 +335,7 @@
             </details>
             <!-- ヘッダーエリア -->
             <div class="text-center md:text-left space-y-2 mb-0 pb-0">
-                <h1 class="text-3xl md:text-6xl font-header tracking-tighter text-white whitespace-nowrap">SCIENCE <span id="app-version-display" class="font-flashy text-2xl md:text-4xl" style="color: var(--accent-primary)">2026 ULTRA Master <span class="text-[0.4em] md:text-[0.7em] opacity-70 font-normal">for 102th</span></span></h1>
+                <h1 class="text-3xl md:text-6xl font-header tracking-normal text-white whitespace-normal md:whitespace-nowrap">SCIENCE <span id="app-version-display" class="font-flashy block md:inline text-xl md:text-4xl" style="color: var(--accent-primary)">2026 ULTRA Master <span class="text-[0.4em] md:text-[0.7em] opacity-70 font-normal">for 102th</span></span></h1>
                 <div class="flex flex-wrap justify-center md:justify-start items-center gap-2">
                     <button id="active-user-display" class="bg-white/10 text-white text-[10px] px-4 py-1 rounded-full border border-white/20 font-black italic cursor-pointer transition-all hover:opacity-80">LOADING...</button>
                     <button id="question-shuffle-display" class="bg-white/10 text-white text-[10px] px-4 py-1 rounded-full border border-white/20 font-black italic cursor-pointer transition-all hover:opacity-80">SHUFFLE OFF</button>
@@ -388,6 +388,7 @@
                             <div class="bg-slate-900/50 p-2 md:p-3 rounded-xl border border-white/5 text-center"><p class="text-[8px] text-slate-300 mb-0.5 uppercase font-bold">最大連続</p><p id="max-streak-display" class="text-sm md:text-lg font-flashy text-cyan-400">0</p></div>
                             <div class="bg-slate-900/50 p-2 md:p-3 rounded-xl border border-white/5 text-center"><p class="text-[8px] text-slate-300 mb-0.5 uppercase font-bold">Quit</p><p id="quit-count-display" class="text-sm md:text-lg font-flashy text-rose-300">0</p></div>
                         </div>
+                        <div class="text-xs py-2"><span id="code102-save-notice"></span> <button type="button" onclick="window.retryCode102Pending()" class="px-2 py-1 border border-white/20" title="未保存回答を再送"><i class="fas fa-rotate-right" aria-hidden="true"></i> 保存確認</button></div>
                         <div id="ranking-card-wrapper" class="ranking-card space-y-2">
                             <h3 class="text-[10px] font-black text-amber-400 uppercase italic flex items-center justify-between gap-2 mb-3">
                                 <span><i class="fas fa-trophy"></i> Season Top Scholars</span>
@@ -467,6 +468,7 @@
                             <span id="admin-status-display" class="text-[8px] text-white/40 uppercase font-black">locked</span>
                         </div>
                         <div class="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-2">
+                            <button type="button" onclick="window.loadCode102Admin()" class="text-xs py-2">固定ID別の履歴を表示</button><div id="code102-admin-output" class="text-xs overflow-auto max-h-96"></div>
                             <input id="admin-key-input" type="password" autocomplete="off" class="w-full bg-black border border-slate-700 rounded p-2 text-[10px] text-amber-200 outline-none" placeholder="adminKey">
                             <button id="admin-load-btn" class="bg-amber-500/20 text-amber-100 px-4 py-2 rounded-lg font-black uppercase text-[10px] border border-amber-400/30">Load</button>
                         </div>
@@ -850,7 +852,7 @@
         }
 
         function getCurrentUserIdLabel() {
-            if (USER_CLASS && USER_NUMBER && USER_NAME) return `${USER_CLASS}-${USER_NUMBER}-${USER_NAME}`;
+            if (USER_CLASS && USER_NUMBER && USER_NAME) return currentStudentCode();
             return USER_NAME || 'admin';
         }
 
@@ -1382,6 +1384,126 @@
                 : [];
         }
 
+        const CODE102_VERSION = 'code102-v1';
+        let sessionSelections = [];
+        const code102InFlight = new Map();
+        function currentStudentCode() {
+            const stored = localStorage.getItem('r8m2_student_code_v1') || '';
+            return /^10221(0[1-9]|[12]\d|3[0-3])$/.test(stored) || /^10222(0[1-9]|[12]\d|3[0-4])$/.test(stored) ? stored : '';
+        }
+        function declaredStudentCode() {
+            const n = String(USER_NUMBER || '');
+            const max = USER_CLASS === '菊' ? 33 : USER_CLASS === '桜' ? 34 : 0;
+            return /^[1-9]\d?$/.test(n) && Number(n) <= max ? `102${USER_CLASS === '菊' ? '21' : '22'}${n.padStart(2, '0')}` : '';
+        }
+        function code102Pending() {
+            const raw = localStorage.getItem('r8m2_code102_pending_v1');
+            const rows = raw ? JSON.parse(raw) : [];
+            if (!Array.isArray(rows)) throw new Error('未保存の回答を読み取れません。保存領域は消去しないでください。');
+            return rows;
+        }
+        function code102Notice(text) {
+            const el = document.getElementById('code102-save-notice');
+            if (el) el.textContent = text;
+        }
+        async function code102Submit(original) {
+            let code = currentStudentCode();
+            if (!code) {
+                const drafts = JSON.parse(localStorage.getItem('r8m2_identity_pending_v1') || '[]');
+                const draft = { payload: original, legacyKey: JSON.stringify([USER_CLASS, USER_NUMBER, USER_NAME]) };
+                if (!drafts.some(d => d.payload.action === original.action && d.payload.sessionId === original.sessionId)) {
+                    drafts.push(draft); localStorage.setItem('r8m2_identity_pending_v1', JSON.stringify(drafts));
+                }
+                code102Notice('回答を保持しています。生徒IDを確認中…');
+                if (activeSync?.promise) await activeSync.promise;
+                code = currentStudentCode();
+                if (!code || localStorage.getItem('r8m2_resolved_legacy_key_v1') !== draft.legacyKey || localStorage.getItem('r8m2_resolved_legacy_code_v1') !== code) throw new Error('回答時の登録と生徒IDの対応を確認できません。回答は端末に保持しています。');
+                original = {...original,userClass:USER_CLASS,userNumber:USER_NUMBER};
+            }
+            if (!code) throw new Error('正式な生徒IDを設定してください。');
+            const payload = { ...original, userId: code, studentCode: code, identityVersion: CODE102_VERSION };
+            const key = `${payload.action}:${payload.sessionId}`;
+            const pending = code102Pending();
+            const saved = pending.find(p => `${p.action}:${p.sessionId}` === key);
+            if (saved && JSON.stringify(saved) !== JSON.stringify(payload)) throw new Error('保存待ちの回答と内容が異なります。');
+            if (!saved) { pending.push(payload); localStorage.setItem('r8m2_code102_pending_v1', JSON.stringify(pending)); }
+            const identityDrafts = JSON.parse(localStorage.getItem('r8m2_identity_pending_v1') || '[]');
+            localStorage.setItem('r8m2_identity_pending_v1', JSON.stringify(identityDrafts.filter(d => d.payload.action !== original.action || d.payload.sessionId !== original.sessionId)));
+            if (code102InFlight.has(key)) return code102InFlight.get(key);
+            const job = (async () => {
+                code102Notice('回答を保存しています…');
+                const controller = new AbortController();
+                const timer = setTimeout(() => controller.abort(), 90000);
+                try {
+                    const response = await fetch(FIXED_GAS_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(payload), signal: controller.signal });
+                    if (!response.ok) throw new Error('保存先に接続できませんでした。');
+                    const result = await response.json();
+                    if (!['success','duplicate_skipped'].includes(result.status)) throw new Error(result.message || result.error || '保存を確認できませんでした。');
+                    if (Number.isSafeInteger(result.profileRevision)) localStorage.setItem('r8m2_profile_revision_' + code, String(result.profileRevision));
+                    localStorage.setItem('r8m2_code102_pending_v1', JSON.stringify(code102Pending().filter(p => `${p.action}:${p.sessionId}` !== key)));
+                    code102Notice(code102Pending().length ? '保存待ちの回答があります。' : '保存済み');
+                    return result;
+                } catch (error) {
+                    code102Notice('未保存の回答をこの端末に保持しています。');
+                    throw error;
+                } finally { clearTimeout(timer); code102InFlight.delete(key); }
+            })();
+            code102InFlight.set(key, job);
+            return job;
+        }
+        window.retryCode102Pending = async () => {
+            try {
+                const errors = [];
+                const pending = code102Pending().filter(p => p.studentCode === currentStudentCode());
+                for (const p of pending) { try { await code102Submit(p); } catch(error) { errors.push(error.message); } }
+                const legacyKey = localStorage.getItem('r8m2_resolved_legacy_key_v1');
+                const resolvedCode = localStorage.getItem('r8m2_resolved_legacy_code_v1');
+                const drafts = JSON.parse(localStorage.getItem('r8m2_identity_pending_v1') || '[]').filter(d => d.legacyKey === legacyKey && resolvedCode === currentStudentCode());
+                for (const d of drafts) { try { await code102Submit({...d.payload,userClass:USER_CLASS,userNumber:USER_NUMBER}); } catch(error) { errors.push(error.message); } }
+                await window.syncAllFromSpreadsheet(true, { force: true });
+                if (errors.length) showModal('保存確認', [...new Set(errors)].join('\n'));
+            } catch (error) { showModal('保存確認', error.message); }
+        };
+        window.saveStatusToSpreadsheet = async () => {
+            try {
+                const revisionKey = 'r8m2_profile_revision_' + currentStudentCode();
+                const revision = Number(localStorage.getItem(revisionKey) || 0);
+                await code102Submit({action:'updateStatus',spreadsheetId:getSpreadsheetIdFromInput(),userId:currentStudentCode(),dbName:USER_NAME,userClass:USER_CLASS,userNumber:USER_NUMBER,isPublic:isRankingPublic?'1':'0',status:USER_STATUS||'',sessionId:crypto.randomUUID(),profileRevision:revision});
+            } catch(error) { showModal('保存確認',error.message); }
+        };
+        window.loadCode102Admin = async () => {
+            const host = document.getElementById('code102-admin-output');
+            host.replaceChildren();
+            try {
+                const key = getAdminKey();
+                if (!key) throw new Error('管理者キーを入力してください。');
+                const response = await fetch(FIXED_GAS_URL, {method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'code102Admin',id:getSpreadsheetIdFromInput(),identityVersion:CODE102_VERSION,adminKey:key})});
+                const data = await response.json();
+                if (data.status !== 'success') throw new Error(data.error || data.message || '一覧を取得できませんでした。');
+                const summary = document.createElement('p');
+                summary.textContent = `更新 ${data.updatedAt} / 教師用 ${data.excluded.teacher}件 / 保留 ${data.excluded.hold}件 / 未対応 ${data.excluded.unresolved}件 / 旧版の確認待ち ${data.legacyPending || 0}件`;
+                host.appendChild(summary);
+                data.students.forEach(student => {
+                    const section = document.createElement('details');
+                    const title = document.createElement('summary');
+                    title.textContent = `${student.code} ${student.group}${student.number}番 ${student.names} / ${student.sessions}回 / ${student.exp} EXP`;
+                    section.appendChild(title);
+                    section.addEventListener('toggle', () => {
+                    if (!section.open || section.dataset.loaded) return;
+                    section.dataset.loaded = 'true';
+                    const table = document.createElement('table'); table.style.cssText='width:100%;font-size:12px;border-collapse:collapse;';
+                    const add = cells => { const tr=document.createElement('tr');cells.forEach(value=>{const td=document.createElement('td');td.textContent=String(value);td.style.cssText='padding:6px;border-bottom:1px solid #64748b;overflow-wrap:anywhere;';tr.appendChild(td);});table.appendChild(tr); };
+                    add(['日時','単元','範囲','得点 / 正解率']);
+                    student.history.forEach(row=>add([row.timestamp,row.era,row.range,`${row.score} / ${row.accuracy}`]));
+                    add(['日時','単元','問題番号','結果']);
+                    student.details.forEach(row=>add([row.timestamp,row.era,row.number,row.result]));
+                    section.appendChild(table);
+                    });
+                    host.appendChild(section);
+                });
+            } catch(error) { host.textContent = error.message; }
+        };
+
         function initUserInfo() { 
             USER_NAME = normalizeUserName(localStorage.getItem('ethics_user_name') || '');
             USER_CLASS = localStorage.getItem('ethics_user_class') || '';
@@ -1414,7 +1536,7 @@
                 labelSpan.className = isRankingPublic ? 'text-[7px] text-amber-400/70 font-normal ml-1' : 'text-[7px] text-slate-300/80 font-normal ml-1';
                 labelSpan.textContent = publicLabel;
                 const nameText = USER_NAME ? USER_NAME : '未登録';
-                const labelText = USER_CLASS && USER_NUMBER ? `${USER_CLASS}-${USER_NUMBER} ` : '';
+                const labelText = currentStudentCode() ? `ID ${currentStudentCode()} / ${USER_CLASS}-${USER_NUMBER} ` : '教師用・未設定 / ';
                 displayEl.textContent = `${labelText}${nameText}`;
                 displayEl.appendChild(labelSpan);
                 // 公開設定に応じてスタイルを変更（光らせる=公開）
@@ -1519,6 +1641,7 @@
             isRankingPublic = !isRankingPublic;
             localStorage.setItem('ethics_ranking_public', isRankingPublic.toString());
             updateUserDisplay();
+            window.saveStatusToSpreadsheet();
         }
         function updateShuffleDisplay() {
             const displayEl = getEl('question-shuffle-display');
@@ -1564,6 +1687,7 @@
             if (!confirm('ログアウトしますか？')) return;
             window.M2AiTutor?.logout();
             USER_NAME = '';
+            localStorage.removeItem('r8m2_student_code_v1');
             USER_CLASS = '';
             USER_NUMBER = '';
             USER_STATUS = '';
@@ -1585,7 +1709,7 @@
         };
 
         setOnClick('register-btn', () => {
-            const nameVal = normalizeUserName(getEl('user-name-input').value.trim());
+            const nameVal = normalizeUserName(getEl('user-name-input').value.trim()) || '生徒';
             const classVal = getEl('user-class-select').value;
             const numberVal = getEl('user-number-input').value.trim();
             
@@ -1603,8 +1727,8 @@
                 return;
             }
             const numberNum = parseInt(numberVal);
-            if (isNaN(numberNum) || numberNum < 1 || numberNum > 40) {
-                showModal("登録エラー", "番号は1~40の半角数字で入力してください。");
+            if (isNaN(numberNum) || numberNum < 1 || numberNum > (classVal === '菊' ? 33 : 34)) {
+                showModal("登録エラー", "菊は1〜33番、桜は1〜34番で入力してください。");
                 return;
             }
             
@@ -1616,7 +1740,9 @@
             
             USER_NAME = nameVal;
             USER_CLASS = classVal;
-            USER_NUMBER = numberVal;
+            USER_NUMBER = String(numberNum);
+            localStorage.setItem('r8m2_student_code_v1', declaredStudentCode());
+            questionStats = {};
             
             localStorage.setItem('ethics_user_name', USER_NAME);
             localStorage.setItem('ethics_user_class', USER_CLASS);
@@ -1628,7 +1754,7 @@
             updateShuffleDisplay();
             window.syncAllFromSpreadsheet(true);
         });
-        setOnClick('active-user-display', toggleRankingPublic);
+        setOnClick('active-user-display', () => currentStudentCode() ? toggleRankingPublic() : getEl('registration-modal').classList.add('active'));
         setOnClick('logout-btn', window.logoutUser);
         setOnClick('user-status-display', window.openStatusModal);
         setOnClick('question-shuffle-display', toggleQuestionShuffle);
@@ -1647,7 +1773,7 @@
         }
 
         function createSessionId(userId = "") {
-            const baseUserId = String(userId || `${USER_CLASS}-${USER_NUMBER}-${USER_NAME}` || "user").replace(/\s+/g, "_");
+            const baseUserId = String(userId || currentStudentCode() || "user").replace(/\s+/g, "_");
             if (window.crypto && typeof window.crypto.randomUUID === 'function') {
                 return `${baseUserId}-${Date.now()}-${window.crypto.randomUUID().slice(0, 8)}`;
             }
@@ -1655,14 +1781,14 @@
         }
 
         window.historyReviewPanel = window.HistoryReview.mount(document.getElementById('history-review-list'), () => ({
-            userId: `${USER_CLASS}-${USER_NUMBER}-${USER_NAME}`,
+            userId: currentStudentCode(),
             history: cumulativeHistory, questions: masterDataTotal, images: imageMapById, math: renderMath,
             load: async entry => {
                 const spreadsheetUrl = getEl('main-spreadsheet-url')?.value || FIXED_SPREADSHEET_URL;
                 const id = spreadsheetUrl.match(/\/d\/([a-zA-Z0-9-_]+)/)?.[1];
                 if (!id) throw new Error('スプレッドシートを確認してください。');
                 const response = await fetch(`${FIXED_GAS_URL}?${new URLSearchParams({
-                    action: 'getHistoryReview', id, userId: `${USER_CLASS}-${USER_NUMBER}-${USER_NAME}`,
+                    action: 'getHistoryReview', id, userId: currentStudentCode(),
                     timestamp: String(entry.timestamp), era: entry.summaryEra, range: entry.summaryRange
                 })}`, { signal: AbortSignal.timeout(30000) });
                 if (!response.ok) throw new Error('履歴を取得できませんでした。');
@@ -1675,7 +1801,8 @@
                 era: q.era,
                 qIdx: q.id.split('-').pop(),
                 attemptNum: (questionStats[q.id]?.total || 1),
-                result: sessionAnswers[idx] ? "○" : "×"
+                result: sessionAnswers[idx] ? "○" : "×",
+                selected: sessionSelections[idx], sourceOptions: q.options, sourceQuestion: q.question
             }));
         }
 
@@ -1690,7 +1817,7 @@
             if (!sid) return null;
             
             // ユーザーIDの生成（クラス-番号-名前形式）
-            const userId = `${USER_CLASS}-${USER_NUMBER}-${USER_NAME}`;
+            const userId = currentStudentCode();
             if (!currentSessionId) currentSessionId = createSessionId(userId);
             
             const payload = { 
@@ -1713,7 +1840,7 @@
             };
             const loggingSessionId = currentSessionId;
             const pendingLog = (async () => {
-                const result = await fetchWithRetry(`${FIXED_GAS_URL}?${new URLSearchParams(payload).toString()}`);
+                const result = await code102Submit(payload);
                 if (result && (result.status === 'success' || result.status === 'duplicate_skipped')) {
                     if (currentSessionId === loggingSessionId) sessionLogCompleted = true;
                 }
@@ -1743,7 +1870,7 @@
             const spreadsheetUrl = urlInput && urlInput.value ? urlInput.value : FIXED_SPREADSHEET_URL;
             const sid = spreadsheetUrl.match(/\/d\/([a-zA-Z0-9-_]+)/)?.[1];
             if (!sid) return null;
-            const userId = `${USER_CLASS}-${USER_NUMBER}-${USER_NAME}`;
+            const userId = currentStudentCode();
             const payload = {
                 action: 'logQuit',
                 spreadsheetId: sid,
@@ -1759,7 +1886,7 @@
                 status: USER_STATUS || ''
             };
             try {
-                const result = await fetchWithRetry(`${FIXED_GAS_URL}?${new URLSearchParams(payload).toString()}`);
+                const result = await code102Submit(payload);
                 window.syncAllFromSpreadsheet(true);
                 return result;
             } catch (e) {
@@ -1798,7 +1925,7 @@
             let maxStatusWidth = 0;
             tempSpan.className = 'font-bold text-indigo-300';
             entries.forEach((r) => {
-                const statusDisplay = (r.status || (r.name === USER_NAME ? USER_STATUS : '')) || '--';
+                const statusDisplay = (r.status || (r.studentCode === currentStudentCode() ? USER_STATUS : '')) || '--';
                 tempSpan.textContent = String(statusDisplay);
                 maxStatusWidth = Math.max(maxStatusWidth, tempSpan.offsetWidth);
             });
@@ -1903,7 +2030,7 @@
                 const exp = Number(r.exp) || 0;
                 const rLv = Math.floor(exp / 10);
                 const userNameDisplay = r.name || r.dbName || r.userName || r.user_name || '--';
-                const isMe = userNameDisplay === USER_NAME;
+                const isMe = r.studentCode === currentStudentCode();
                 const lastDateDisplay = getRankingLastDateDisplay(r, isMe, historyForMe);
                 const statusDisplay = escapeHtmlAttribute((r.status || (isMe ? USER_STATUS : '')) || '--');
                 const finalUserName = escapeHtmlAttribute(r.name || r.dbName || userNameDisplay || 'Unknown');
@@ -2052,9 +2179,9 @@
                 
                 // ランキングデータがある場合のみランクを表示（分母も含める）
                 if (rankingData && rankingData.length > 0) {
-                    const myRank = rankingData.findIndex(r => (r.name || r.dbName) === USER_NAME) + 1;
+                    const myRank = rankingData.findIndex(r => r.studentCode === currentStudentCode()) + 1;
                     const totalRanking = rankingData.length;
-                    const myData = rankingData.find(r => (r.name || r.dbName) === USER_NAME);
+                    const myData = rankingData.find(r => r.studentCode === currentStudentCode());
                     
                     if (getEl('current-rank-display')) {
                         const rankEl = getEl('current-rank-display');
@@ -2799,10 +2926,10 @@
 
         async function startQuiz() { QuizFeedback.clear();
             await loadImageMap();
-            currentIdx = 0; score = 0; streak = 0; sessionAnswers = []; 
+            currentIdx = 0; score = 0; streak = 0; sessionAnswers = []; sessionSelections = [];
             isSessionFinalizing = false;
             isQuestionTransitioning = false;
-            const userId = `${USER_CLASS}-${USER_NUMBER}-${USER_NAME}`;
+            const userId = currentStudentCode();
             currentSessionId = createSessionId(userId);
             sessionLogPromise = null;
             sessionLogCompleted = false;
@@ -2935,7 +3062,7 @@
 
             canAnswer = false;
             try {
-                const isCorrect = (selected === q.answer); if (isCorrect) QuizFeedback.correct(); else QuizFeedback.clear(); sessionAnswers[currentIdx] = isCorrect;
+                const isCorrect = (selected === q.answer); if (isCorrect) QuizFeedback.correct(); else QuizFeedback.clear(); sessionAnswers[currentIdx] = isCorrect; sessionSelections[currentIdx] = selected;
             const exist = questionStats[statKey] || { total: 0, correct: 0 }; 
             const today = new Date();
             today.setHours(0, 0, 0, 0);
@@ -3022,6 +3149,7 @@
                 streak = previousStreak;
                 if (hadPreviousAnswer) sessionAnswers[currentIdx] = previousAnswer;
                 else delete sessionAnswers[currentIdx];
+                delete sessionSelections[currentIdx];
                 getEl(`dot-${currentIdx}`)?.classList.remove('dot-correct', 'dot-wrong');
                 showQuestionRecovery(error);
             }
@@ -3172,7 +3300,7 @@
             });
 
             try {
-                localStorage.setItem('r8m2_question_stats', JSON.stringify(questionStats));
+                localStorage.setItem('r8m2_question_stats_' + currentStudentCode(), JSON.stringify(questionStats));
             } catch (e) {
                 console.error('復習システムの情報の保存に失敗しました:', e);
             }
@@ -3210,7 +3338,7 @@
                 await logQuitToSpreadsheet();
                 currentIdx = 0;
                 score = 0;
-                sessionAnswers = [];
+                sessionAnswers = []; sessionSelections = [];
                 quizData = [];
                 canAnswer = true;
                 isSessionFinalizing = false;
@@ -3281,7 +3409,11 @@
         }
 
         async function requestProblemSync(action, sid, userId, timeoutMs) {
-            const params = new URLSearchParams({ action, id: sid });
+            const params = new URLSearchParams({ action, id: sid, identityVersion: CODE102_VERSION });
+            if (action !== 'syncMaterials' && !currentStudentCode() && USER_NAME && USER_CLASS && USER_NUMBER) {
+                params.set('legacyUserId', [USER_CLASS, USER_NUMBER, USER_NAME].join('-'));
+                params.set('legacyName', USER_NAME); params.set('legacyClass', USER_CLASS); params.set('legacyNumber', USER_NUMBER);
+            }
             if (userId) params.set('userId', userId);
             const controller = new AbortController();
             const timeout = setTimeout(() => controller.abort(), timeoutMs);
@@ -3295,6 +3427,20 @@
         }
 
         function applySyncedHistory(result, statsAtStart) {
+            if (!currentStudentCode() && result.identity?.kind === 'student') {
+                localStorage.setItem('r8m2_resolved_legacy_key_v1', JSON.stringify([USER_CLASS, USER_NUMBER, USER_NAME]));
+                localStorage.setItem('r8m2_resolved_legacy_code_v1', result.identity.code);
+                localStorage.setItem('r8m2_student_code_v1', result.identity.code);
+                USER_CLASS = result.identity.code.slice(3,5) === '21' ? '菊' : '桜';
+                USER_NUMBER = String(Number(result.identity.code.slice(5)));
+                localStorage.setItem('ethics_user_class', USER_CLASS);
+                localStorage.setItem('ethics_user_number', USER_NUMBER);
+                updateUserDisplay();
+            }
+            if (result.identity?.code === currentStudentCode() && Number.isSafeInteger(result.profileRevision)) localStorage.setItem('r8m2_profile_revision_' + currentStudentCode(), String(result.profileRevision));
+            try { code102Notice(code102Pending().length ? '保存待ちの回答があります。' : ''); } catch(error) { code102Notice(error.message); }
+            try { if (JSON.parse(localStorage.getItem('r8m2_identity_pending_v1') || '[]').length) code102Notice('ID確認待ちの回答を保持しています。'); } catch(error) { code102Notice('ID確認待ちの回答を読み取れません。保存領域は消去しないでください。'); }
+            if (!currentStudentCode() && USER_NAME) code102Notice('生徒IDは未設定です。組・番号を確認して登録してください。');
             Object.entries(result.userStats || {}).forEach(([key, s]) => {
                 // A late response must not replace an answer made while the read was pending.
                 if (questionStats[key] !== statsAtStart[key]) return;
@@ -3378,7 +3524,7 @@
                 if (!isAuto) showModal('Sync Error', 'スプレッドシートURLが正しくありません。');
                 return;
             }
-            const userId = USER_NAME && USER_CLASS && USER_NUMBER ? `${USER_CLASS}-${USER_NUMBER}-${USER_NAME}` : '';
+            const userId = USER_NAME && USER_CLASS && USER_NUMBER ? currentStudentCode() : '';
             if (!force && activeSync?.sid === sid && activeSync.userId === userId) return activeSync.promise;
             if (activeSync && activeSync.sid !== sid) materialLibraryReady = false;
             const request = { sid, userId, materialsApplied: false };
@@ -3417,7 +3563,7 @@
             
             // 復習システムの情報をローカルストレージから読み込む
             try {
-                const savedStats = localStorage.getItem('r8m2_question_stats');
+                const savedStats = localStorage.getItem('r8m2_question_stats_' + currentStudentCode());
                 if (savedStats) {
                     const parsed = JSON.parse(savedStats);
                     // 既存のquestionStatsとマージ（復習システムの情報を追加）
