@@ -330,11 +330,6 @@
         <div id="home-screen" class="fade-in">
             <details class="my-4 border-y border-white/20 py-3">
                 <summary class="cursor-pointer font-bold">過去の取り組み</summary>
-                <div id="teacher-history-import-tools" class="hidden flex flex-wrap items-center gap-2 py-2">
-                    <button type="button" id="teacher-history-import-btn" class="px-2 py-1 border border-white/20 text-xs">旧履歴を取り込む</button>
-                    <input type="file" id="teacher-history-import-file" accept="application/json,.json" hidden>
-                    <span id="teacher-history-import-status" class="text-xs" role="status"></span>
-                </div>
                 <div id="history-review-list" class="text-sm"></div>
             </details>
             <!-- ヘッダーエリア -->
@@ -1388,122 +1383,37 @@
                 : [];
         }
 
+var M2_EARTH_SET = '3-6地学応用';
+var M2_EARTH_SOURCES = [
+  '3-6気圧・圧力と水蒸気(応用確認)',
+  '3-7気象観測・天気図・前線(応用確認)',
+  '3-8日本の気象(応用確認)'
+];
+
+function m2CombinedUnit_(name) {
+  return M2_EARTH_SOURCES.indexOf(name) >= 0 ? M2_EARTH_SET : name;
+}
+
+function m2UnitLabel_(raw) {
+  var name = String(raw || '');
+  if (name === M2_EARTH_SET) return '地学応用';
+  if (/^(?:\d+-\d+\s*)?生物後半\s*[(（]\s*応用確認\s*[)）]$/.test(name.trim())) return '2-9生物応用';
+  return name.replace(/[(（]\s*応用確認\s*[)）]/g,'(応用)').replace(/\s*[(（]\s*基本\s*[)）]/g,'');
+}
+
         const CODE102_VERSION = 'code102-v1';
         let sessionSelections = [];
         const code102InFlight = new Map();
-        function isTeacherPreview(group = USER_CLASS, number = USER_NUMBER) {
-            return group === '菊' && String(number) === '34';
-        }
         function code102StatsKey() {
-            return 'r8m2_question_stats_' + (isTeacherPreview() ? teacherHistoryPrefix() : currentStudentCode());
-        }
-        function teacherHistoryPrefix() {
-            return 'r8m2_teacher_history_v1:' + JSON.stringify([USER_NAME]) + ':';
-        }
-        function teacherHistoryState() {
-            const prefix = teacherHistoryPrefix();
-            const history = [];
-            try {
-                for (const key of Object.keys(localStorage)) {
-                    if (!key.startsWith(prefix)) continue;
-                    try {
-                        const row = JSON.parse(localStorage.getItem(key));
-                        if (Number.isFinite(row?.timestamp) && Array.isArray(row.items)) {
-                            history.push({timestamp:row.timestamp, summaryEra:row.summaryEra, summaryRange:row.summaryRange, storageKey:key});
-                        }
-                    } catch (_) {
-                        // Leave unreadable records in place.
-                    }
-                }
-            } catch (_) {
-                code102Notice('このブラウザーの履歴を読み込めません。');
-            }
-            return {userId:prefix, history};
-        }
-        async function loadTeacherHistory(entry) {
-            if (!isTeacherPreview() || !entry.storageKey?.startsWith(teacherHistoryPrefix())) {
-                throw new Error('登録が切り替わりました。履歴を開き直してください。');
-            }
-            const row = JSON.parse(localStorage.getItem(entry.storageKey));
-            if (!Array.isArray(row?.items)) throw new Error('この履歴を読み込めません。');
-            return {status:'success',items:row.items};
-        }
-        function saveTeacherHistory(details, range) {
-            if (!currentSessionId) currentSessionId = createSessionId();
-            const key = teacherHistoryPrefix() + currentSessionId;
-            const items = details.map(row => ({era:row.era, number:Number(row.qIdx), result:row.result}));
-            try {
-                if (localStorage.getItem(key) === null) {
-                    localStorage.setItem(key, JSON.stringify({
-                        timestamp:Date.now(), summaryEra:currentSessionEra, summaryRange:range, items
-                    }));
-                }
-            } catch (_) {
-                return {status:'teacher_history_failed',appliedExp:0};
-            }
-            window.historyReviewPanel?.refresh();
-            return {status:'teacher_history_saved',appliedExp:0};
-        }
-        async function importTeacherHistory(event) {
-            const file = event.target.files?.[0];
-            event.target.value = '';
-            if (!file || !isTeacherPreview()) return;
-            const prefix = teacherHistoryPrefix();
-            const status = document.getElementById('teacher-history-import-status');
-            let added = 0;
-            try {
-                if (file.size > 2 * 1024 * 1024) throw new Error('ファイルが大きすぎます。');
-                const data = JSON.parse(await file.text());
-                if (data?.format !== 'r8m2-teacher-history-v1' || !Array.isArray(data.entries) || data.entries.length > 500) {
-                    throw new Error('対応する履歴ファイルを選択してください。');
-                }
-                if (!isTeacherPreview() || prefix !== teacherHistoryPrefix() ||
-                    data.owner?.group !== USER_CLASS || data.owner?.number !== USER_NUMBER ||
-                    typeof data.owner?.name !== 'string' || normalizeUserName(data.owner.name) !== USER_NAME) {
-                    throw new Error('登録名と履歴ファイルの名義が一致しません。');
-                }
-                const validText = value => typeof value === 'string' && value.length > 0 && value.length <= 250;
-                const seen = new Set();
-                const rows = data.entries.map(row => {
-                    if (!row || typeof row.sourceKey !== 'string' || !/^server-[1-9]\d{0,8}$/.test(row.sourceKey) ||
-                        seen.has(row.sourceKey) || !Number.isSafeInteger(row.timestamp) || row.timestamp <= 0 ||
-                        row.timestamp > Date.now() || !validText(row.summaryEra) || !validText(row.summaryRange) ||
-                        !Array.isArray(row.items) || row.items.length < 1 || row.items.length > 200) {
-                        throw new Error('履歴ファイルの形式を確認してください。');
-                    }
-                    seen.add(row.sourceKey);
-                    const items = row.items.map(item => {
-                        if (!item || !validText(item.era) || !Number.isSafeInteger(item.number) || item.number < 1 ||
-                            item.number > 10000 || !['○','×'].includes(item.result)) {
-                            throw new Error('履歴ファイルの問題別記録を確認してください。');
-                        }
-                        return {era:item.era, number:item.number, result:item.result};
-                    });
-                    return [prefix + row.sourceKey, JSON.stringify({
-                        timestamp:row.timestamp, summaryEra:row.summaryEra, summaryRange:row.summaryRange, items
-                    })];
-                });
-                for (const [key, value] of rows) {
-                    if (localStorage.getItem(key) === null) {
-                        localStorage.setItem(key, value);
-                        added++;
-                    }
-                }
-                status.textContent = added ? added + '件をこのブラウザーに取り込みました。' : '追加する履歴はありません。';
-            } catch (error) {
-                status.textContent = added ? added + '件まで取り込みました。残りは再試行できます。' :
-                    error instanceof SyntaxError ? '履歴ファイルを読み込めません。' : error.message;
-            }
-            window.historyReviewPanel?.refresh();
+            return 'r8m2_question_stats_' + currentStudentCode();
         }
         function currentStudentCode() {
-            if (isTeacherPreview()) return '';
             const stored = localStorage.getItem('r8m2_student_code_v1') || '';
-            return /^10221(0[1-9]|[12]\d|3[0-3])$/.test(stored) || /^10222(0[1-9]|[12]\d|3[0-4])$/.test(stored) ? stored : '';
+            return /^1022[12](0[1-9]|[12]\d|3[0-4])$/.test(stored) ? stored : '';
         }
         function declaredStudentCode() {
             const n = String(USER_NUMBER || '');
-            const max = USER_CLASS === '菊' ? 33 : USER_CLASS === '桜' ? 34 : 0;
+            const max = USER_CLASS === '菊' || USER_CLASS === '桜' ? 34 : 0;
             return /^[1-9]\d?$/.test(n) && Number(n) <= max ? `102${USER_CLASS === '菊' ? '21' : '22'}${n.padStart(2, '0')}` : '';
         }
         function code102Pending() {
@@ -1516,8 +1426,17 @@
             const el = document.getElementById('code102-save-notice');
             if (el) el.textContent = text;
         }
+        function applyCode102Profile(code, profile) {
+            if (!code || !Number.isSafeInteger(profile?.revision) || !['0','1'].includes(profile.isPublic)) return;
+            const revisionKey = 'r8m2_profile_revision_' + code;
+            if (profile.revision < Number(localStorage.getItem(revisionKey) || 0)) return;
+            localStorage.setItem(revisionKey, String(profile.revision));
+            if (code !== currentStudentCode()) return;
+            isRankingPublic = profile.isPublic === '1';
+            localStorage.setItem('ethics_ranking_public', String(isRankingPublic));
+            updateUserDisplay();
+        }
         async function code102Submit(original) {
-            if (isTeacherPreview()) return {status:'teacher_preview',appliedExp:0};
             let code = currentStudentCode();
             if (!code) {
                 const drafts = JSON.parse(localStorage.getItem('r8m2_identity_pending_v1') || '[]');
@@ -1550,7 +1469,7 @@
                     if (!response.ok) throw new Error('保存先に接続できませんでした。');
                     const result = await response.json();
                     if (!['success','duplicate_skipped'].includes(result.status)) throw new Error(result.message || result.error || '保存を確認できませんでした。');
-                    if (Number.isSafeInteger(result.profileRevision)) localStorage.setItem('r8m2_profile_revision_' + code, String(result.profileRevision));
+                    applyCode102Profile(code, result.profile);
                     localStorage.setItem('r8m2_code102_pending_v1', JSON.stringify(code102Pending().filter(p => `${p.action}:${p.sessionId}` !== key)));
                     code102Notice(code102Pending().length ? '保存待ちの回答があります。' : '保存済み');
                     return result;
@@ -1563,7 +1482,6 @@
             return job;
         }
         window.retryCode102Pending = async () => {
-            if (isTeacherPreview()) return;
             try {
                 const errors = [];
                 const pending = code102Pending().filter(p => p.studentCode === currentStudentCode());
@@ -1576,13 +1494,19 @@
                 if (errors.length) showModal('保存確認', [...new Set(errors)].join('\n'));
             } catch (error) { showModal('保存確認', error.message); }
         };
-        window.saveStatusToSpreadsheet = async () => {
-            if (isTeacherPreview()) return;
+        let code102ProfileBusy = false;
+        window.saveStatusToSpreadsheet = async (profileField = 'status', visibility = false) => {
+            if (code102ProfileBusy) return;
+            const code = currentStudentCode();
+            if (!code) return;
+            code102ProfileBusy = true;
             try {
-                const revisionKey = 'r8m2_profile_revision_' + currentStudentCode();
+                const revisionKey = 'r8m2_profile_revision_' + code;
                 const revision = Number(localStorage.getItem(revisionKey) || 0);
-                await code102Submit({action:'updateStatus',spreadsheetId:getSpreadsheetIdFromInput(),userId:currentStudentCode(),dbName:USER_NAME,userClass:USER_CLASS,userNumber:USER_NUMBER,isPublic:isRankingPublic?'1':'0',status:USER_STATUS||'',sessionId:crypto.randomUUID(),profileRevision:revision});
+                await code102Submit({action:'updateStatus',spreadsheetId:getSpreadsheetIdFromInput(),userId:code,dbName:USER_NAME,userClass:USER_CLASS,userNumber:USER_NUMBER,isPublic:(profileField==='visibility'?visibility:isRankingPublic)?'1':'0',status:USER_STATUS||'',sessionId:crypto.randomUUID(),profileRevision:revision,profileField});
+                void window.syncAllFromSpreadsheet(true, { force: true });
             } catch(error) { showModal('保存確認',error.message); }
+            finally { code102ProfileBusy = false; }
         };
         window.loadCode102Admin = async () => {
             const host = document.getElementById('code102-admin-output');
@@ -1617,11 +1541,6 @@
             } catch(error) { host.textContent = error.message; }
         };
 
-        function formatUnitLabel(raw) {
-            const name = String(raw || '');
-            if (/^(?:\d+-\d+\s*)?生物後半\s*[(（]\s*応用確認\s*[)）]$/.test(name.trim())) return '2-9生物応用';
-            return name.replace(/[(（]\s*応用確認\s*[)）]/g, '(応用)');
-        }
         function initUserInfo() { 
             USER_NAME = normalizeUserName(localStorage.getItem('ethics_user_name') || '');
             USER_CLASS = localStorage.getItem('ethics_user_class') || '';
@@ -1630,7 +1549,7 @@
             USER_STATUS = localStorage.getItem('ethics_user_status') || '';
             // ローカルストレージに値がない場合はデフォルトで公開（true）
             const storedPublic = localStorage.getItem('ethics_ranking_public');
-            isRankingPublic = !isTeacherPreview() && (storedPublic === null || storedPublic === 'true');
+            isRankingPublic = storedPublic === null ? true : storedPublic === 'true';
             // ローカルストレージから問題シャッフル設定を読み込む（デフォルトはOFF）
             const storedShuffle = localStorage.getItem('ethics_question_shuffle');
             isQuestionShuffleEnabled = storedShuffle === 'true';
@@ -1646,10 +1565,6 @@
             } 
         }
         function updateUserDisplay() { 
-            if (isTeacherPreview()) code102Notice('履歴はこのブラウザーだけに保存されます。');
-            getEl('teacher-history-import-tools').classList.toggle('hidden', !isTeacherPreview());
-            getEl('teacher-history-import-status').textContent = '';
-            window.historyReviewPanel?.refresh();
             const displayEl = getEl('active-user-display');
             if (displayEl) {
                 // 名前の横に公開/非公開を小さく英語で表示
@@ -1658,7 +1573,7 @@
                 labelSpan.className = isRankingPublic ? 'text-[7px] text-amber-400/70 font-normal ml-1' : 'text-[7px] text-slate-300/80 font-normal ml-1';
                 labelSpan.textContent = publicLabel;
                 const nameText = USER_NAME ? USER_NAME : '未登録';
-                const labelText = isTeacherPreview() ? '菊-34 / ' : currentStudentCode() ? `ID ${currentStudentCode()} / ${USER_CLASS}-${USER_NUMBER} ` : '未設定 / ';
+                const labelText = currentStudentCode() ? `ID ${currentStudentCode()} / ${USER_CLASS}-${USER_NUMBER} ` : '未設定 / ';
                 displayEl.textContent = `${labelText}${nameText}`;
                 displayEl.appendChild(labelSpan);
                 // 公開設定に応じてスタイルを変更（光らせる=公開）
@@ -1760,10 +1675,7 @@
             if (input) input.value = '';
         };
         function toggleRankingPublic() {
-            isRankingPublic = !isRankingPublic;
-            localStorage.setItem('ethics_ranking_public', isRankingPublic.toString());
-            updateUserDisplay();
-            window.saveStatusToSpreadsheet();
+            window.saveStatusToSpreadsheet('visibility', !isRankingPublic);
         }
         function updateShuffleDisplay() {
             const displayEl = getEl('question-shuffle-display');
@@ -1849,7 +1761,7 @@
                 return;
             }
             const numberNum = parseInt(numberVal);
-            if (isNaN(numberNum) || numberNum < 1 || (!isTeacherPreview(classVal, numberNum) && numberNum > (classVal === '菊' ? 33 : 34))) {
+            if (isNaN(numberNum) || numberNum < 1 || numberNum > 34) {
                 showModal("登録エラー", "番号は1〜34の半角数字で入力してください。");
                 return;
             }
@@ -1863,12 +1775,7 @@
             USER_NAME = nameVal;
             USER_CLASS = classVal;
             USER_NUMBER = String(numberNum);
-            if (isTeacherPreview()) {
-                localStorage.removeItem('r8m2_student_code_v1');
-                isRankingPublic = false;
-            } else {
-                localStorage.setItem('r8m2_student_code_v1', declaredStudentCode());
-            }
+            localStorage.setItem('r8m2_student_code_v1', declaredStudentCode());
             questionStats = {};
             
             localStorage.setItem('ethics_user_name', USER_NAME);
@@ -1882,8 +1789,6 @@
             window.syncAllFromSpreadsheet(true);
         });
         setOnClick('active-user-display', () => currentStudentCode() ? toggleRankingPublic() : getEl('registration-modal').classList.add('active'));
-        setOnClick('teacher-history-import-btn', () => { if (isTeacherPreview()) getEl('teacher-history-import-file').click(); });
-        getEl('teacher-history-import-file').addEventListener('change', importTeacherHistory);
         setOnClick('logout-btn', window.logoutUser);
         setOnClick('user-status-display', window.openStatusModal);
         setOnClick('question-shuffle-display', toggleQuestionShuffle);
@@ -1910,8 +1815,9 @@
         }
 
         window.historyReviewPanel = window.HistoryReview.mount(document.getElementById('history-review-list'), () => ({
-            ...(isTeacherPreview() ? teacherHistoryState() : {userId:currentStudentCode(), history:cumulativeHistory}), questions: masterDataTotal, images: imageMapById, math: renderMath, formatEra: formatUnitLabel,
-            load: isTeacherPreview() ? loadTeacherHistory : async entry => {
+            userId: currentStudentCode(),
+            history: cumulativeHistory, questions: masterDataTotal, images: imageMapById, math: renderMath, formatEra: m2UnitLabel_,
+            load: async entry => {
                 const spreadsheetUrl = getEl('main-spreadsheet-url')?.value || FIXED_SPREADSHEET_URL;
                 const id = spreadsheetUrl.match(/\/d\/([a-zA-Z0-9-_]+)/)?.[1];
                 if (!id) throw new Error('スプレッドシートを確認してください。');
@@ -1935,7 +1841,6 @@
         }
 
         async function logDetailedResultsToSpreadsheet(pct, correct, total, detailEntries = null, rangeLabel = currentSessionRangeLabel) {
-            if (isTeacherPreview()) return saveTeacherHistory(detailEntries || buildSessionDetails(), rangeLabel);
             if (!FIXED_GAS_URL) return null;
             if (sessionLogCompleted) return { status: 'duplicate_skipped', appliedExp: 0, expReason: '重複記録スキップ' };
             if (sessionLogPromise) return sessionLogPromise;
@@ -1994,7 +1899,6 @@
         }
 
         async function logQuitToSpreadsheet() {
-            if (isTeacherPreview()) return null;
             if (!FIXED_GAS_URL) return null;
             const urlInput = getEl('main-spreadsheet-url');
             const spreadsheetUrl = urlInput && urlInput.value ? urlInput.value : FIXED_SPREADSHEET_URL;
@@ -2816,6 +2720,9 @@
                 categories = allSheetNames;
             }
             
+            if (M2_EARTH_SOURCES.every(era => masterDataTotal.some(q => q.era === era))) {
+                categories = Array.from(new Set(categories.map(m2CombinedUnit_)));
+            }
             console.log('表示するカテゴリ順序:', categories);
             
             const eraSessionStats = buildEraSessionStats(userHistory);
@@ -2849,7 +2756,9 @@
             
             // 各分野（シート名）を表示
             categories.forEach((categoryName) => {
-                let categoryProblems = masterDataTotal.filter(d => d.era === categoryName);
+                const categoryProblems = categoryName === M2_EARTH_SET
+                    ? M2_EARTH_SOURCES.flatMap(era => masterDataTotal.filter(d => d.era === era))
+                    : masterDataTotal.filter(d => d.era === categoryName);
                 
                 // Weak Pointsモードの場合は、通常のメニュー表示をスキップ（後で専用UIを表示）
                 if (isWeakPointsMode) {
@@ -2862,7 +2771,7 @@
                 const lastDateDisplay = formatDateYmd(sessionInfo.lastTs);
                 eHeader.innerHTML = `
                     <div class="flex flex-col min-w-0">
-                        <span>${escapeHtmlAttribute(formatUnitLabel(categoryName))} <small class="opacity-50">(${categoryProblems.length})</small></span>
+                        <span>${escapeHtmlAttribute(m2UnitLabel_(categoryName))} <small class="opacity-50">(${categoryProblems.length})</small></span>
                         <span class="text-[10px] text-slate-400 leading-tight">解いた回数: ${sessionInfo.count}回</span>
                         <span class="text-[10px] text-slate-400 leading-tight">最終: ${lastDateDisplay}</span>
                     </div>
@@ -3127,7 +3036,7 @@
 
                 canAnswer = true; getEl('q-current').innerText = currentIdx + 1;
             getEl('current-accuracy').innerText = (currentIdx === 0 ? 0 : Math.round((score/currentIdx)*100)) + '%'; 
-            getEl('current-streak').innerText = streak; getEl('diff-badge').innerText = `${formatUnitLabel(q.era)} | ${q.tag}`;
+            getEl('current-streak').innerText = streak; getEl('diff-badge').innerText = `${m2UnitLabel_(q.era)} | ${q.tag}`;
             const statKey = q.id;
             const qs = questionStats[statKey] || { total: 0, correct: 0 }; 
             if(getEl('q-history-stat')) getEl('q-history-stat').innerText = `${qs.total === 0 ? 0 : Math.round((qs.correct / qs.total) * 100)}% (${qs.correct}/${qs.total})`; 
@@ -3385,7 +3294,7 @@
             getEl('result-screen')?.classList.remove('hidden');
             if (lvUpMsg) lvUpMsg.classList.add('hidden');
             if (expNoteEl) expNoteEl.innerText = '';
-            if (saveStatusEl) saveStatusEl.innerText = isTeacherPreview() ? '履歴を保存しています…' : '成績を記録しています…';
+            if (saveStatusEl) saveStatusEl.innerText = '成績を記録しています…';
             if (getEl('final-exp-gained')) getEl('final-exp-gained').innerText = score;
             if (getEl('final-score')) getEl('final-score').innerText = pct;
 
@@ -3413,7 +3322,7 @@
                 const appliedExp = saved ? (Number.isFinite(appliedExpRaw) ? appliedExpRaw : finishedScore) : 0;
                 if (getEl('final-exp-gained')) getEl('final-exp-gained').innerText = appliedExp;
                 if (expNoteEl) expNoteEl.innerText = (logResult && logResult.expReason) ? `※ ${logResult.expReason}` : '';
-                if (saveStatusEl) saveStatusEl.innerText = logResult?.status === 'teacher_history_saved' ? 'このブラウザーに履歴を保存しました。' : isTeacherPreview() ? 'このブラウザーに履歴を保存できませんでした。' : saved ? '成績を記録しました。' : '成績を記録できませんでした。通信状態を確認してください。';
+                if (saveStatusEl) saveStatusEl.innerText = saved ? '成績を記録しました。' : '成績を記録できませんでした。通信状態を確認してください。';
                 const newLv = Math.floor((oldExp + appliedExp) / 10);
                 if (lvUpMsg) {
                     if (newLv > oldLv) lvUpMsg.classList.remove('hidden');
@@ -3540,7 +3449,7 @@
 
         async function requestProblemSync(action, sid, userId, timeoutMs) {
             const params = new URLSearchParams({ action, id: sid, identityVersion: CODE102_VERSION });
-            if (action !== 'syncMaterials' && !isTeacherPreview() && !currentStudentCode() && USER_NAME && USER_CLASS && USER_NUMBER) {
+            if (action !== 'syncMaterials' && !currentStudentCode() && USER_NAME && USER_CLASS && USER_NUMBER) {
                 params.set('legacyUserId', [USER_CLASS, USER_NUMBER, USER_NAME].join('-'));
                 params.set('legacyName', USER_NAME); params.set('legacyClass', USER_CLASS); params.set('legacyNumber', USER_NUMBER);
             }
@@ -3557,7 +3466,7 @@
         }
 
         function applySyncedHistory(result, statsAtStart) {
-            if (!isTeacherPreview() && !currentStudentCode() && result.identity?.kind === 'student') {
+            if (!currentStudentCode() && result.identity?.kind === 'student') {
                 localStorage.setItem('r8m2_resolved_legacy_key_v1', JSON.stringify([USER_CLASS, USER_NUMBER, USER_NAME]));
                 localStorage.setItem('r8m2_resolved_legacy_code_v1', result.identity.code);
                 localStorage.setItem('r8m2_student_code_v1', result.identity.code);
@@ -3567,11 +3476,10 @@
                 localStorage.setItem('ethics_user_number', USER_NUMBER);
                 updateUserDisplay();
             }
-            if (result.identity?.code === currentStudentCode() && Number.isSafeInteger(result.profileRevision)) localStorage.setItem('r8m2_profile_revision_' + currentStudentCode(), String(result.profileRevision));
+            if (result.identity?.code === currentStudentCode()) applyCode102Profile(currentStudentCode(), result.profile);
             try { code102Notice(code102Pending().length ? '保存待ちの回答があります。' : ''); } catch(error) { code102Notice(error.message); }
             try { if (JSON.parse(localStorage.getItem('r8m2_identity_pending_v1') || '[]').length) code102Notice('ID確認待ちの回答を保持しています。'); } catch(error) { code102Notice('ID確認待ちの回答を読み取れません。保存領域は消去しないでください。'); }
-            if (isTeacherPreview()) code102Notice('履歴はこのブラウザーだけに保存されます。');
-            else if (!currentStudentCode() && USER_NAME) code102Notice('生徒IDは未設定です。組・番号を確認して登録してください。');
+            if (!currentStudentCode() && USER_NAME) code102Notice('生徒IDは未設定です。組・番号を確認して登録してください。');
             Object.entries(result.userStats || {}).forEach(([key, s]) => {
                 // A late response must not replace an answer made while the read was pending.
                 if (questionStats[key] !== statsAtStart[key]) return;
