@@ -294,7 +294,7 @@
                     <label class="text-[10px] text-slate-300 uppercase font-bold block text-left">名前</label>
                     <input id="user-name-input" type="text" class="w-full bg-black border border-indigo-500/50 rounded-xl p-3 text-center text-white outline-none font-bold" placeholder="SCHOLAR NAME">
                 </div>
-                <p id="id-annotation" class="text-[10px] text-cyan-400 italic font-bold">記録は生徒IDに紐付きます。教師用の試用結果は保存されません。</p>
+                <p id="id-annotation" class="text-[10px] text-cyan-400 italic font-bold">教師用の履歴は、このブラウザー内に保存されます。</p>
             </div>
             <button id="register-btn" class="w-full bg-indigo-600 text-white py-3 rounded-xl font-black uppercase hover:bg-indigo-500 transition-all">Connect to Hub</button>
         </div>
@@ -1393,6 +1393,53 @@
         function code102StatsKey() {
             return 'r8m2_question_stats_' + (isTeacherPreview() ? 'teacher-preview' : currentStudentCode());
         }
+        function teacherHistoryPrefix() {
+            return 'r8m2_teacher_history_v1:' + JSON.stringify([USER_NAME]) + ':';
+        }
+        function teacherHistoryState() {
+            const prefix = teacherHistoryPrefix();
+            const history = [];
+            try {
+                for (const key of Object.keys(localStorage)) {
+                    if (!key.startsWith(prefix)) continue;
+                    try {
+                        const row = JSON.parse(localStorage.getItem(key));
+                        if (Number.isFinite(row?.timestamp) && Array.isArray(row.items)) {
+                            history.push({timestamp:row.timestamp, summaryEra:row.summaryEra, summaryRange:row.summaryRange, storageKey:key});
+                        }
+                    } catch (_) {
+                        // Leave unreadable records in place.
+                    }
+                }
+            } catch (_) {
+                code102Notice('このブラウザーの教師用履歴を読み込めません。');
+            }
+            return {userId:prefix, history};
+        }
+        async function loadTeacherHistory(entry) {
+            if (!isTeacherPreview() || !entry.storageKey?.startsWith(teacherHistoryPrefix())) {
+                throw new Error('登録が切り替わりました。履歴を開き直してください。');
+            }
+            const row = JSON.parse(localStorage.getItem(entry.storageKey));
+            if (!Array.isArray(row?.items)) throw new Error('この履歴を読み込めません。');
+            return {status:'success',items:row.items};
+        }
+        function saveTeacherHistory(details, range) {
+            if (!currentSessionId) currentSessionId = createSessionId();
+            const key = teacherHistoryPrefix() + currentSessionId;
+            const items = details.map(row => ({era:row.era, number:Number(row.qIdx), result:row.result}));
+            try {
+                if (localStorage.getItem(key) === null) {
+                    localStorage.setItem(key, JSON.stringify({
+                        timestamp:Date.now(), summaryEra:currentSessionEra, summaryRange:range, items
+                    }));
+                }
+            } catch (_) {
+                return {status:'teacher_history_failed',appliedExp:0};
+            }
+            window.historyReviewPanel?.refresh();
+            return {status:'teacher_history_saved',appliedExp:0};
+        }
         function currentStudentCode() {
             if (isTeacherPreview()) return '';
             const stored = localStorage.getItem('r8m2_student_code_v1') || '';
@@ -1543,7 +1590,8 @@
             } 
         }
         function updateUserDisplay() { 
-            if (isTeacherPreview()) code102Notice('教師用の試用結果は成績に保存されません。');
+            if (isTeacherPreview()) code102Notice('教師用の履歴はこのブラウザーだけに保存されます。');
+            window.historyReviewPanel?.refresh();
             const displayEl = getEl('active-user-display');
             if (displayEl) {
                 // 名前の横に公開/非公開を小さく英語で表示
@@ -1802,9 +1850,8 @@
         }
 
         window.historyReviewPanel = window.HistoryReview.mount(document.getElementById('history-review-list'), () => ({
-            userId: currentStudentCode(),
-            history: cumulativeHistory, questions: masterDataTotal, images: imageMapById, math: renderMath, formatEra: formatUnitLabel,
-            load: async entry => {
+            ...(isTeacherPreview() ? teacherHistoryState() : {userId:currentStudentCode(), history:cumulativeHistory}), questions: masterDataTotal, images: imageMapById, math: renderMath, formatEra: formatUnitLabel,
+            load: isTeacherPreview() ? loadTeacherHistory : async entry => {
                 const spreadsheetUrl = getEl('main-spreadsheet-url')?.value || FIXED_SPREADSHEET_URL;
                 const id = spreadsheetUrl.match(/\/d\/([a-zA-Z0-9-_]+)/)?.[1];
                 if (!id) throw new Error('スプレッドシートを確認してください。');
@@ -1828,7 +1875,7 @@
         }
 
         async function logDetailedResultsToSpreadsheet(pct, correct, total, detailEntries = null, rangeLabel = currentSessionRangeLabel) {
-            if (isTeacherPreview()) return {status:'teacher_preview',appliedExp:0};
+            if (isTeacherPreview()) return saveTeacherHistory(detailEntries || buildSessionDetails(), rangeLabel);
             if (!FIXED_GAS_URL) return null;
             if (sessionLogCompleted) return { status: 'duplicate_skipped', appliedExp: 0, expReason: '重複記録スキップ' };
             if (sessionLogPromise) return sessionLogPromise;
@@ -3278,7 +3325,7 @@
             getEl('result-screen')?.classList.remove('hidden');
             if (lvUpMsg) lvUpMsg.classList.add('hidden');
             if (expNoteEl) expNoteEl.innerText = '';
-            if (saveStatusEl) saveStatusEl.innerText = isTeacherPreview() ? '教師用の試用結果は成績に保存されません。' : '成績を記録しています…';
+            if (saveStatusEl) saveStatusEl.innerText = isTeacherPreview() ? '教師用の履歴を保存しています…' : '成績を記録しています…';
             if (getEl('final-exp-gained')) getEl('final-exp-gained').innerText = score;
             if (getEl('final-score')) getEl('final-score').innerText = pct;
 
@@ -3306,7 +3353,7 @@
                 const appliedExp = saved ? (Number.isFinite(appliedExpRaw) ? appliedExpRaw : finishedScore) : 0;
                 if (getEl('final-exp-gained')) getEl('final-exp-gained').innerText = appliedExp;
                 if (expNoteEl) expNoteEl.innerText = (logResult && logResult.expReason) ? `※ ${logResult.expReason}` : '';
-                if (saveStatusEl) saveStatusEl.innerText = logResult?.status === 'teacher_preview' ? '教師用の試用結果は成績に保存されません。' : saved ? '成績を記録しました。' : '成績を記録できませんでした。通信状態を確認してください。';
+                if (saveStatusEl) saveStatusEl.innerText = logResult?.status === 'teacher_history_saved' ? '教師用の履歴をこのブラウザーに保存しました。' : isTeacherPreview() ? 'このブラウザーに履歴を保存できませんでした。' : saved ? '成績を記録しました。' : '成績を記録できませんでした。通信状態を確認してください。';
                 const newLv = Math.floor((oldExp + appliedExp) / 10);
                 if (lvUpMsg) {
                     if (newLv > oldLv) lvUpMsg.classList.remove('hidden');
@@ -3463,7 +3510,7 @@
             if (result.identity?.code === currentStudentCode() && Number.isSafeInteger(result.profileRevision)) localStorage.setItem('r8m2_profile_revision_' + currentStudentCode(), String(result.profileRevision));
             try { code102Notice(code102Pending().length ? '保存待ちの回答があります。' : ''); } catch(error) { code102Notice(error.message); }
             try { if (JSON.parse(localStorage.getItem('r8m2_identity_pending_v1') || '[]').length) code102Notice('ID確認待ちの回答を保持しています。'); } catch(error) { code102Notice('ID確認待ちの回答を読み取れません。保存領域は消去しないでください。'); }
-            if (isTeacherPreview()) code102Notice('教師用の試用結果は成績に保存されません。');
+            if (isTeacherPreview()) code102Notice('教師用の履歴はこのブラウザーだけに保存されます。');
             else if (!currentStudentCode() && USER_NAME) code102Notice('生徒IDは未設定です。組・番号を確認して登録してください。');
             Object.entries(result.userStats || {}).forEach(([key, s]) => {
                 // A late response must not replace an answer made while the read was pending.
