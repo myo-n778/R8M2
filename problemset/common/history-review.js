@@ -19,7 +19,7 @@
       img.src = url.href; img.alt = entry.alt || match[1];
     }
   }
-  function createReport(win, entry, items, questions, images, math) {
+  function createReport(win, entry, items, questions, images, math, formatEra = value => value) {
     const doc = win.document;
     doc.title = '取り組み結果'; doc.documentElement.lang = 'ja'; doc.body.replaceChildren();
     const viewport = el(doc, 'meta', undefined, doc.head);
@@ -54,12 +54,12 @@
     });
     const main = el(doc, 'main', undefined, doc.body);
     el(doc, 'h1', '取り組み結果', main);
-    el(doc, 'p', new Date(entry.timestamp).toLocaleString('ja-JP') + '\n' + entry.summaryEra + ' / ' + entry.summaryRange, main);
+    el(doc, 'p', new Date(entry.timestamp).toLocaleString('ja-JP') + '\n' + formatEra(entry.summaryEra) + ' / ' + entry.summaryRange, main);
     el(doc, 'p', '問題文・正解・解説は現在の内容です。問題の並べ替えや削除があると、当時の問題と一致しない場合があります。', main).className = 'note';
     const byId = new Map(questions.map(q => [q.id, q]));
     items.forEach((item, index) => {
       const article = el(doc, 'article', undefined, main);
-      el(doc, 'h2', `${index + 1}. ${item.era} / 問題${item.number}`, article);
+      el(doc, 'h2', `${index + 1}. ${formatEra(item.era)} / 問題${item.number}`, article);
       const q = byId.get(item.era + '-' + item.number);
       el(doc, 'p', item.result === '○' ? '正解' : item.result === '×' ? '不正解' : '正誤不明', article).className = 'result';
       if (!q) { el(doc, 'p', '現在の問題データに該当する問題がありません。', article); return; }
@@ -79,10 +79,11 @@
     const render = () => {
       root.replaceChildren();
       const state = getState();
+      const formatEra = state.formatEra || (value => value);
       const history = [...state.history].sort((a, b) => b.timestamp - a.timestamp);
       if (!history.length) { el(document, 'p', '取り組み履歴はありません。', root); return; }
       history.slice(0, count).forEach(entry => {
-        const button = el(document, 'button', new Date(entry.timestamp).toLocaleString('ja-JP') + '　' + entry.summaryEra + ' / ' + entry.summaryRange, root);
+        const button = el(document, 'button', new Date(entry.timestamp).toLocaleString('ja-JP') + '　' + formatEra(entry.summaryEra) + ' / ' + entry.summaryRange, root);
         button.type = 'button';
         button.style.cssText = 'display:block;width:100%;text-align:left;padding:12px 0;border-bottom:1px solid #8885;overflow-wrap:anywhere';
         button.addEventListener('click', async () => {
@@ -94,7 +95,7 @@
             if (win.closed) return;
             if (result.status !== 'success' || !Array.isArray(result.items)) throw new Error(result.message || '履歴閲覧にはGASの更新が必要です。');
             if (getState().userId !== state.userId) throw new Error('利用者が切り替わりました。履歴を開き直してください。');
-            createReport(win, entry, result.items, state.questions, state.images, state.math);
+            createReport(win, entry, result.items, state.questions, state.images, state.math, formatEra);
           } catch (error) {
             if (!win.closed) { win.document.body.replaceChildren(); el(win.document, 'p', error.message || '履歴を取得できませんでした。元の画面から開き直してください。', win.document.body); }
           }

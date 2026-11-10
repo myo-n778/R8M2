@@ -617,7 +617,7 @@
 
     <!-- 共通設定・共通関数 -->
     <script src="./common/science-shared.js?v=20261009-seasons"></script>
-    <script src="./common/history-review.js"></script>
+    <script src="./common/history-review.js?v=20261110-labels"></script>
     <link rel="stylesheet" href="./common/ai-tutor.css">
     <script src="./common/ai-tutor.js?v=20260916-routing"></script>
     <!-- スクリプト部分は以前のものを継続して使用 -->
@@ -1504,6 +1504,11 @@
             } catch(error) { host.textContent = error.message; }
         };
 
+        function formatUnitLabel(raw) {
+            const name = String(raw || '');
+            if (/^(?:\d+-\d+\s*)?生物後半\s*[(（]\s*応用確認\s*[)）]$/.test(name.trim())) return '生物応用';
+            return name.replace(/[(（]\s*応用確認\s*[)）]/g, '(応用)');
+        }
         function initUserInfo() { 
             USER_NAME = normalizeUserName(localStorage.getItem('ethics_user_name') || '');
             USER_CLASS = localStorage.getItem('ethics_user_class') || '';
@@ -1782,7 +1787,7 @@
 
         window.historyReviewPanel = window.HistoryReview.mount(document.getElementById('history-review-list'), () => ({
             userId: currentStudentCode(),
-            history: cumulativeHistory, questions: masterDataTotal, images: imageMapById, math: renderMath,
+            history: cumulativeHistory, questions: masterDataTotal, images: imageMapById, math: renderMath, formatEra: formatUnitLabel,
             load: async entry => {
                 const spreadsheetUrl = getEl('main-spreadsheet-url')?.value || FIXED_SPREADSHEET_URL;
                 const id = spreadsheetUrl.match(/\/d\/([a-zA-Z0-9-_]+)/)?.[1];
@@ -2732,7 +2737,7 @@
                 const lastDateDisplay = formatDateYmd(sessionInfo.lastTs);
                 eHeader.innerHTML = `
                     <div class="flex flex-col min-w-0">
-                        <span>${categoryName} <small class="opacity-50">(${categoryProblems.length})</small></span>
+                        <span>${escapeHtmlAttribute(formatUnitLabel(categoryName))} <small class="opacity-50">(${categoryProblems.length})</small></span>
                         <span class="text-[10px] text-slate-400 leading-tight">解いた回数: ${sessionInfo.count}回</span>
                         <span class="text-[10px] text-slate-400 leading-tight">最終: ${lastDateDisplay}</span>
                     </div>
@@ -2997,7 +3002,7 @@
 
                 canAnswer = true; getEl('q-current').innerText = currentIdx + 1;
             getEl('current-accuracy').innerText = (currentIdx === 0 ? 0 : Math.round((score/currentIdx)*100)) + '%'; 
-            getEl('current-streak').innerText = streak; getEl('diff-badge').innerText = `${q.era} | ${q.tag}`; 
+            getEl('current-streak').innerText = streak; getEl('diff-badge').innerText = `${formatUnitLabel(q.era)} | ${q.tag}`;
             const statKey = q.id;
             const qs = questionStats[statKey] || { total: 0, correct: 0 }; 
             if(getEl('q-history-stat')) getEl('q-history-stat').innerText = `${qs.total === 0 ? 0 : Math.round((qs.correct / qs.total) * 100)}% (${qs.correct}/${qs.total})`; 
