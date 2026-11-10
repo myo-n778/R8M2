@@ -1396,7 +1396,7 @@ function m2CombinedUnit_(name) {
 
 function m2UnitLabel_(raw) {
   var name = String(raw || '');
-  if (name === M2_EARTH_SET) return '地学応用';
+  if (m2CombinedUnit_(name) === M2_EARTH_SET) return M2_EARTH_SET;
   if (/^(?:\d+-\d+\s*)?生物後半\s*[(（]\s*応用確認\s*[)）]$/.test(name.trim())) return '2-9生物応用';
   return name.replace(/[(（]\s*応用確認\s*[)）]/g,'(応用)').replace(/\s*[(（]\s*基本\s*[)）]/g,'');
 }
