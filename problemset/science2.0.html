@@ -1620,7 +1620,7 @@
 
         function formatUnitLabel(raw) {
             const name = String(raw || '');
-            if (/^(?:\d+-\d+\s*)?生物後半\s*[(（]\s*応用確認\s*[)）]$/.test(name.trim())) return '生物応用';
+            if (/^(?:\d+-\d+\s*)?生物後半\s*[(（]\s*応用確認\s*[)）]$/.test(name.trim())) return '3-9生物応用';
             return name.replace(/[(（]\s*応用確認\s*[)）]/g, '(応用)');
         }
         function initUserInfo() { 
