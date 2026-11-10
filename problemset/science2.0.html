@@ -287,14 +287,14 @@
                 </div>
                 <div class="space-y-2">
                     <label class="text-[10px] text-slate-300 uppercase font-bold block text-left">番号</label>
-                    <input id="user-number-input" type="text" class="w-full bg-black border border-indigo-500/50 rounded-xl p-3 text-center text-white outline-none font-bold" placeholder="1~40" maxlength="2" pattern="[0-9]*" inputmode="numeric" oninput="this.value = this.value.replace(/[^0-9]/g, '')">
-                    <p class="text-[9px] text-amber-400 italic">※半角数字で1~40の範囲で入力してください</p>
+                    <input id="user-number-input" type="text" class="w-full bg-black border border-indigo-500/50 rounded-xl p-3 text-center text-white outline-none font-bold" placeholder="番号" maxlength="2" pattern="[0-9]*" inputmode="numeric" oninput="this.value = this.value.replace(/[^0-9]/g, '')">
+                    <p class="text-[9px] text-amber-400 italic">菊1〜33・桜1〜34（菊34は教師用）</p>
                 </div>
                 <div class="space-y-2">
                     <label class="text-[10px] text-slate-300 uppercase font-bold block text-left">名前</label>
                     <input id="user-name-input" type="text" class="w-full bg-black border border-indigo-500/50 rounded-xl p-3 text-center text-white outline-none font-bold" placeholder="SCHOLAR NAME">
                 </div>
-                <p id="id-annotation" class="text-[10px] text-cyan-400 italic font-bold">※記録は名前に紐付けされます。</p>
+                <p id="id-annotation" class="text-[10px] text-cyan-400 italic font-bold">記録は生徒IDに紐付きます。教師用の試用結果は保存されません。</p>
             </div>
             <button id="register-btn" class="w-full bg-indigo-600 text-white py-3 rounded-xl font-black uppercase hover:bg-indigo-500 transition-all">Connect to Hub</button>
         </div>
@@ -1387,7 +1387,14 @@
         const CODE102_VERSION = 'code102-v1';
         let sessionSelections = [];
         const code102InFlight = new Map();
+        function isTeacherPreview(group = USER_CLASS, number = USER_NUMBER) {
+            return group === '菊' && String(number) === '34';
+        }
+        function code102StatsKey() {
+            return 'r8m2_question_stats_' + (isTeacherPreview() ? 'teacher-preview' : currentStudentCode());
+        }
         function currentStudentCode() {
+            if (isTeacherPreview()) return '';
             const stored = localStorage.getItem('r8m2_student_code_v1') || '';
             return /^10221(0[1-9]|[12]\d|3[0-3])$/.test(stored) || /^10222(0[1-9]|[12]\d|3[0-4])$/.test(stored) ? stored : '';
         }
@@ -1407,6 +1414,7 @@
             if (el) el.textContent = text;
         }
         async function code102Submit(original) {
+            if (isTeacherPreview()) return {status:'teacher_preview',appliedExp:0};
             let code = currentStudentCode();
             if (!code) {
                 const drafts = JSON.parse(localStorage.getItem('r8m2_identity_pending_v1') || '[]');
@@ -1452,6 +1460,7 @@
             return job;
         }
         window.retryCode102Pending = async () => {
+            if (isTeacherPreview()) return;
             try {
                 const errors = [];
                 const pending = code102Pending().filter(p => p.studentCode === currentStudentCode());
@@ -1465,6 +1474,7 @@
             } catch (error) { showModal('保存確認', error.message); }
         };
         window.saveStatusToSpreadsheet = async () => {
+            if (isTeacherPreview()) return;
             try {
                 const revisionKey = 'r8m2_profile_revision_' + currentStudentCode();
                 const revision = Number(localStorage.getItem(revisionKey) || 0);
@@ -1517,7 +1527,7 @@
             USER_STATUS = localStorage.getItem('ethics_user_status') || '';
             // ローカルストレージに値がない場合はデフォルトで公開（true）
             const storedPublic = localStorage.getItem('ethics_ranking_public');
-            isRankingPublic = storedPublic === null ? true : storedPublic === 'true';
+            isRankingPublic = !isTeacherPreview() && (storedPublic === null || storedPublic === 'true');
             // ローカルストレージから問題シャッフル設定を読み込む（デフォルトはOFF）
             const storedShuffle = localStorage.getItem('ethics_question_shuffle');
             isQuestionShuffleEnabled = storedShuffle === 'true';
@@ -1533,6 +1543,7 @@
             } 
         }
         function updateUserDisplay() { 
+            if (isTeacherPreview()) code102Notice('教師用の試用結果は成績に保存されません。');
             const displayEl = getEl('active-user-display');
             if (displayEl) {
                 // 名前の横に公開/非公開を小さく英語で表示
@@ -1541,7 +1552,7 @@
                 labelSpan.className = isRankingPublic ? 'text-[7px] text-amber-400/70 font-normal ml-1' : 'text-[7px] text-slate-300/80 font-normal ml-1';
                 labelSpan.textContent = publicLabel;
                 const nameText = USER_NAME ? USER_NAME : '未登録';
-                const labelText = currentStudentCode() ? `ID ${currentStudentCode()} / ${USER_CLASS}-${USER_NUMBER} ` : '教師用・未設定 / ';
+                const labelText = isTeacherPreview() ? '教師用 菊-34 / ' : currentStudentCode() ? `ID ${currentStudentCode()} / ${USER_CLASS}-${USER_NUMBER} ` : '未設定 / ';
                 displayEl.textContent = `${labelText}${nameText}`;
                 displayEl.appendChild(labelSpan);
                 // 公開設定に応じてスタイルを変更（光らせる=公開）
@@ -1732,8 +1743,8 @@
                 return;
             }
             const numberNum = parseInt(numberVal);
-            if (isNaN(numberNum) || numberNum < 1 || numberNum > (classVal === '菊' ? 33 : 34)) {
-                showModal("登録エラー", "菊は1〜33番、桜は1〜34番で入力してください。");
+            if (isNaN(numberNum) || numberNum < 1 || (!isTeacherPreview(classVal, numberNum) && numberNum > (classVal === '菊' ? 33 : 34))) {
+                showModal("登録エラー", "生徒用は菊1〜33番・桜1〜34番です。菊34番は教師用です。");
                 return;
             }
             
@@ -1746,7 +1757,12 @@
             USER_NAME = nameVal;
             USER_CLASS = classVal;
             USER_NUMBER = String(numberNum);
-            localStorage.setItem('r8m2_student_code_v1', declaredStudentCode());
+            if (isTeacherPreview()) {
+                localStorage.removeItem('r8m2_student_code_v1');
+                isRankingPublic = false;
+            } else {
+                localStorage.setItem('r8m2_student_code_v1', declaredStudentCode());
+            }
             questionStats = {};
             
             localStorage.setItem('ethics_user_name', USER_NAME);
@@ -1812,6 +1828,7 @@
         }
 
         async function logDetailedResultsToSpreadsheet(pct, correct, total, detailEntries = null, rangeLabel = currentSessionRangeLabel) {
+            if (isTeacherPreview()) return {status:'teacher_preview',appliedExp:0};
             if (!FIXED_GAS_URL) return null;
             if (sessionLogCompleted) return { status: 'duplicate_skipped', appliedExp: 0, expReason: '重複記録スキップ' };
             if (sessionLogPromise) return sessionLogPromise;
@@ -1870,6 +1887,7 @@
         }
 
         async function logQuitToSpreadsheet() {
+            if (isTeacherPreview()) return null;
             if (!FIXED_GAS_URL) return null;
             const urlInput = getEl('main-spreadsheet-url');
             const spreadsheetUrl = urlInput && urlInput.value ? urlInput.value : FIXED_SPREADSHEET_URL;
@@ -3260,7 +3278,7 @@
             getEl('result-screen')?.classList.remove('hidden');
             if (lvUpMsg) lvUpMsg.classList.add('hidden');
             if (expNoteEl) expNoteEl.innerText = '';
-            if (saveStatusEl) saveStatusEl.innerText = '成績を記録しています…';
+            if (saveStatusEl) saveStatusEl.innerText = isTeacherPreview() ? '教師用の試用結果は成績に保存されません。' : '成績を記録しています…';
             if (getEl('final-exp-gained')) getEl('final-exp-gained').innerText = score;
             if (getEl('final-score')) getEl('final-score').innerText = pct;
 
@@ -3288,7 +3306,7 @@
                 const appliedExp = saved ? (Number.isFinite(appliedExpRaw) ? appliedExpRaw : finishedScore) : 0;
                 if (getEl('final-exp-gained')) getEl('final-exp-gained').innerText = appliedExp;
                 if (expNoteEl) expNoteEl.innerText = (logResult && logResult.expReason) ? `※ ${logResult.expReason}` : '';
-                if (saveStatusEl) saveStatusEl.innerText = saved ? '成績を記録しました。' : '成績を記録できませんでした。通信状態を確認してください。';
+                if (saveStatusEl) saveStatusEl.innerText = logResult?.status === 'teacher_preview' ? '教師用の試用結果は成績に保存されません。' : saved ? '成績を記録しました。' : '成績を記録できませんでした。通信状態を確認してください。';
                 const newLv = Math.floor((oldExp + appliedExp) / 10);
                 if (lvUpMsg) {
                     if (newLv > oldLv) lvUpMsg.classList.remove('hidden');
@@ -3305,7 +3323,7 @@
             });
 
             try {
-                localStorage.setItem('r8m2_question_stats_' + currentStudentCode(), JSON.stringify(questionStats));
+                localStorage.setItem(code102StatsKey(), JSON.stringify(questionStats));
             } catch (e) {
                 console.error('復習システムの情報の保存に失敗しました:', e);
             }
@@ -3415,7 +3433,7 @@
 
         async function requestProblemSync(action, sid, userId, timeoutMs) {
             const params = new URLSearchParams({ action, id: sid, identityVersion: CODE102_VERSION });
-            if (action !== 'syncMaterials' && !currentStudentCode() && USER_NAME && USER_CLASS && USER_NUMBER) {
+            if (action !== 'syncMaterials' && !isTeacherPreview() && !currentStudentCode() && USER_NAME && USER_CLASS && USER_NUMBER) {
                 params.set('legacyUserId', [USER_CLASS, USER_NUMBER, USER_NAME].join('-'));
                 params.set('legacyName', USER_NAME); params.set('legacyClass', USER_CLASS); params.set('legacyNumber', USER_NUMBER);
             }
@@ -3432,7 +3450,7 @@
         }
 
         function applySyncedHistory(result, statsAtStart) {
-            if (!currentStudentCode() && result.identity?.kind === 'student') {
+            if (!isTeacherPreview() && !currentStudentCode() && result.identity?.kind === 'student') {
                 localStorage.setItem('r8m2_resolved_legacy_key_v1', JSON.stringify([USER_CLASS, USER_NUMBER, USER_NAME]));
                 localStorage.setItem('r8m2_resolved_legacy_code_v1', result.identity.code);
                 localStorage.setItem('r8m2_student_code_v1', result.identity.code);
@@ -3445,7 +3463,8 @@
             if (result.identity?.code === currentStudentCode() && Number.isSafeInteger(result.profileRevision)) localStorage.setItem('r8m2_profile_revision_' + currentStudentCode(), String(result.profileRevision));
             try { code102Notice(code102Pending().length ? '保存待ちの回答があります。' : ''); } catch(error) { code102Notice(error.message); }
             try { if (JSON.parse(localStorage.getItem('r8m2_identity_pending_v1') || '[]').length) code102Notice('ID確認待ちの回答を保持しています。'); } catch(error) { code102Notice('ID確認待ちの回答を読み取れません。保存領域は消去しないでください。'); }
-            if (!currentStudentCode() && USER_NAME) code102Notice('生徒IDは未設定です。組・番号を確認して登録してください。');
+            if (isTeacherPreview()) code102Notice('教師用の試用結果は成績に保存されません。');
+            else if (!currentStudentCode() && USER_NAME) code102Notice('生徒IDは未設定です。組・番号を確認して登録してください。');
             Object.entries(result.userStats || {}).forEach(([key, s]) => {
                 // A late response must not replace an answer made while the read was pending.
                 if (questionStats[key] !== statsAtStart[key]) return;
@@ -3568,7 +3587,7 @@
             
             // 復習システムの情報をローカルストレージから読み込む
             try {
-                const savedStats = localStorage.getItem('r8m2_question_stats_' + currentStudentCode());
+                const savedStats = localStorage.getItem(code102StatsKey());
                 if (savedStats) {
                     const parsed = JSON.parse(savedStats);
                     // 既存のquestionStatsとマージ（復習システムの情報を追加）
