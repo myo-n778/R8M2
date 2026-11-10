@@ -1391,7 +1391,7 @@
             return group === '菊' && String(number) === '34';
         }
         function code102StatsKey() {
-            return 'r8m2_question_stats_' + (isTeacherPreview() ? 'teacher-preview' : currentStudentCode());
+            return 'r8m2_question_stats_' + (isTeacherPreview() ? teacherHistoryPrefix() : currentStudentCode());
         }
         function teacherHistoryPrefix() {
             return 'r8m2_teacher_history_v1:' + JSON.stringify([USER_NAME]) + ':';
