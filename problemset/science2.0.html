@@ -420,6 +420,7 @@
 
                 <div id="session-library" class="glass-panel rounded-[1.5rem] md:rounded-[2.5rem] p-6 md:p-8 space-y-6 flex flex-col">
                     <label class="text-[10px] font-black uppercase italic" style="color: var(--accent-primary)">Session Library</label>
+                    <p id="library-sync-status" role="status" class="hidden !mt-2 text-[10px] text-slate-400"></p>
                     <div class="relative min-h-0">
                         <div id="era-menu-container" class="space-y-1.5 pr-1"></div>
                         <div id="era-scroll-fade" class="pointer-events-none absolute bottom-0 left-0 right-0 h-10 bg-gradient-to-t from-black/80 to-transparent hidden"></div>
@@ -656,7 +657,8 @@
         let canAnswer = true; let chartInstance = null;
         let isSessionFinalizing = false;
         let isQuestionTransitioning = false;
-        let syncInFlightPromise = null;
+        let activeSync = null;
+        let materialLibraryReady = false;
         let currentSessionId = "";
         let sessionLogPromise = null;
         let sessionLogCompleted = false;
@@ -1717,7 +1719,7 @@
                 }
                 if (currentSessionId === loggingSessionId) {
                     // 保存の成否と、その後の画面同期の成否を混同しない。
-                    Promise.resolve().then(() => window.syncAllFromSpreadsheet(true)).catch((error) => {
+                    Promise.resolve().then(() => window.syncAllFromSpreadsheet(true, { force: true })).catch((error) => {
                         console.error('[session-save] post-save sync failed', error);
                     });
                 }
@@ -3216,168 +3218,177 @@
             }
         };
         
-        async function syncAllFromSpreadsheetInternal(isAuto = false) {
-            if (!FIXED_GAS_URL) return;
-            
-            // ユーザー情報が設定されていない場合でも問題データは取得できるようにする
-            let userId = '';
-            const hasUserInfo = USER_NAME && USER_NAME.trim() !== '' && USER_CLASS && USER_NUMBER;
-            
-            if (hasUserInfo) {
-                // ユーザーIDの生成（クラス-番号-名前形式）
-                userId = `${USER_CLASS}-${USER_NUMBER}-${USER_NAME}`;
-            } else {
-                if (!isAuto) {
-                    console.warn('⚠️ [新版] ユーザー情報が未設定。問題データのみ取得します。');
-                }
-                // ユーザー情報がない場合は空文字列を渡す（問題データは取得可能）
-                userId = '';
-            }
-            
-            // UIの入力フィールドからURLを取得（存在する場合）、なければ固定URLを使用
-            const urlInput = getEl('main-spreadsheet-url');
-            const spreadsheetUrl = urlInput && urlInput.value ? urlInput.value : FIXED_SPREADSHEET_URL;
-            const sid = spreadsheetUrl.match(/\/d\/([a-zA-Z0-9-_]+)/)?.[1];
-            
-            if (!sid) {
-                console.error('スプレッドシートIDが取得できません:', spreadsheetUrl);
-                if (!isAuto) showModal("Sync Error", "スプレッドシートURLが正しくありません。");
-                return;
-            }
-            
-            try { 
-                // userIdが空の場合はパラメータを省略しない（GAS側で空文字列として処理）
-                const syncUrl = `${FIXED_GAS_URL}?action=sync&id=${sid}${userId ? `&userId=${encodeURIComponent(userId)}` : ''}`;
-                console.log('🚀 [新版] 同期を開始:', {
-                    url: syncUrl,
-                    spreadsheetId: sid,
-                    hasUserInfo: hasUserInfo,
-                    userId: userId || '(未設定)'
-                });
-                
-                const result = await fetchWithRetry(syncUrl, {}, 0);
-                // Validate the sync contract before mutating cached questions or displayed scores.
-                if (!result || typeof result !== 'object' || Array.isArray(result) ||
-                    result.service === 'science-ai' || !result.problems ||
-                    typeof result.problems !== 'object' || Array.isArray(result.problems) ||
-                    !Object.values(result.problems).every(value => typeof value === 'string')) {
-                    showModal('同期エラー', '教材データを取得できませんでした。接続先の応答が問題集用の形式ではありません。先生にお知らせください。保存済みの問題・成績は変更していません。');
-                    return;
-                }
-                console.log('同期結果全体:', result);
-                console.log('resultの全キー:', Object.keys(result));
-                
-                // エラーチェック
-                if (result.error) {
-                    console.error('同期エラー:', result.error);
-                    if (!isAuto) {
-                        showModal("Sync Error", `データの取得に失敗しました: ${result.error}`);
-                    }
-                    return;
-                }
-                
-                // デバッグ情報を表示
-                if (result.debug) {
-                    console.log('デバッグ情報:', result.debug);
-                    console.log(`全シート数: ${result.debug.totalSheets}`);
-                    console.log(`除外シート: ${result.debug.excludedSheets.join(', ')}`);
-                    console.log(`読み込んだシート: ${result.debug.loadedSheets.join(', ') || '(なし)'}`);
-                    console.log(`問題シート数: ${result.debug.problemCount}`);
-                }
-                
-                console.log('result.problems:', result.problems);
-                console.log('result.problemsの型:', typeof result.problems);
-                console.log('result.problemsのキー:', result.problems ? Object.keys(result.problems) : 'null');
-                
-                // problemsの中身を詳しく確認
-                if (result.problems) {
-                    console.log('result.problemsの詳細:', JSON.stringify(result.problems).substring(0, 500));
-                    const problemKeys = Object.keys(result.problems);
-                    console.log('問題キーの数:', problemKeys.length);
-                    if (problemKeys.length > 0) {
-                        console.log('最初のキー:', problemKeys[0]);
-                        console.log('最初の値のサンプル:', typeof result.problems[problemKeys[0]], result.problems[problemKeys[0]]?.substring(0, 100));
-                    } else {
-                        console.warn('問題シートが読み込まれていません。スプレッドシートに問題シート（システム用シート以外）が存在するか確認してください。');
-                        if (!isAuto) {
-                            showModal("データなし", "問題シートが見つかりませんでした。\n\nスプレッドシートに以下のシートが存在するか確認してください：\n- システム用シート（履歴ログ、詳細履歴ログ、問題別統計DB、成績一覧、メンバー一覧）以外のシート\n- 例：力学、電磁気学など\n\nシート名がそのまま分野名として使用されます。");
-                        }
-                    }
-                } else {
-                    console.error('result.problemsが存在しません');
-                    if (!isAuto) {
-                        showModal("データエラー", "問題データが取得できませんでした。");
-                    }
-                }
-                
-                if (result.problems) {
-                    // データ構造を確認
-                    const cleanedProblems = sanitizeProblemSheets(result.problems);
-                    localStorage.setItem('r8m2_data_main', JSON.stringify(cleanedProblems));
-                    console.log('保存後のローカルストレージ:', localStorage.getItem('r8m2_data_main')?.substring(0, 200));
-                }
-                if (result.imageMap) {
-                    imageMapById = normalizeImageMap(result.imageMap);
-                    localStorage.setItem('r8m2_image_map', JSON.stringify(result.imageMap));
-                    console.log('画像対応表:', Object.keys(imageMapById).length);
-                }
-                // シートの順序を保存（スプレッドシートの左から右の順序）
-                if(result.sheetOrder && result.sheetOrder.length > 0) {
-                    const cleanedSheetOrder = sanitizeSheetOrder(result.sheetOrder);
-                    localStorage.setItem('r8m2_sheet_order', JSON.stringify(cleanedSheetOrder));
-                    console.log('シートの順序:', cleanedSheetOrder);
-                }
-                if(result.userStats) { 
-                    Object.entries(result.userStats).forEach(([key, s]) => { 
-                        questionStats[key] = { 
-                            total: parseInt(s.total) || 0, 
-                            correct: parseInt(s.correct) || 0,
-                            wrong_streak: parseInt(s.wrong_streak) || 0,
-                            last_wrong_at: s.last_wrong_at ? parseInt(s.last_wrong_at) : null,
-                            last_right_at: s.last_right_at ? parseInt(s.last_right_at) : null,
-                            due_at: s.due_at ? parseInt(s.due_at) : null
-                        }; 
-                    }); 
-                }
-                updateRuntimeConfigUI(result.config || null);
-                cumulativeHistory = Array.isArray(result.history) ? result.history : [];
-                userHistory = Array.isArray(result.seasonHistory) ? result.seasonHistory : cumulativeHistory;
-                lifetimeSummaryState = result.lifetimeSummary || { totalExp: 0, sessionCount: cumulativeHistory.length, seasonExp: 0, seasonSessionCount: userHistory.length };
-                pastSeasonRankings = Array.isArray(result.pastSeasonRankings) ? result.pastSeasonRankings : [];
-                lifetimeRankingData = Array.isArray(result.lifetimeRanking) ? result.lifetimeRanking : [];
-                if(result.ranking) {
-                    rankingData = result.ranking;
-                    console.log('ランキングデータ:', rankingData);
-                    if (rankingData.length > 0) {
-                        console.log('最初のランキングエントリ:', rankingData[0]);
-                        console.log('最初のエントリのキー:', Object.keys(rankingData[0]));
-                    }
-                }
-                if (lifetimeRankingData.length === 0) {
-                    lifetimeRankingData = buildFallbackLifetimeRanking();
-                }
-                // 連続正解数をグローバル変数に保存
-                window.currentStreak = result.currentStreak || 0;
-                window.maxStreak = result.maxStreak || 0; 
-                quitCountState = Number(result.quitCount) || 0;
-                updateStatsUI(); window.renderEraMenu(); 
-            } catch (e) { 
-                console.error('❌ [新版] 同期エラー:', e);
-                console.error('❌ [新版] エラースタック:', e.stack);
-                
-                // 詳細なエラーメッセージを表示
-                showDiagnosticError(e, isAuto);
-            } 
+        const MATERIAL_SNAPSHOT_KEY = 'r8m2_material_snapshot_v1';
+        const MATERIAL_SNAPSHOT_MAX_AGE = 15 * 60 * 1000;
+        const DEFAULT_MATERIAL_SHEET = FIXED_SPREADSHEET_URL.match(/\/d\/([\w-]+)/)?.[1];
+
+        function setLibrarySyncStatus(text) {
+            const node = getEl('library-sync-status');
+            if (!node) return;
+            node.textContent = text;
+            node.classList.toggle('hidden', !text);
         }
 
-        window.syncAllFromSpreadsheet = (isAuto = false) => {
-            if (syncInFlightPromise) return syncInFlightPromise;
-            syncInFlightPromise = syncAllFromSpreadsheetInternal(isAuto);
-            return syncInFlightPromise.finally(() => {
-                syncInFlightPromise = null;
+        function isMaterialResponse(data) {
+            return !!data && !data.error && data.service !== 'science-ai' &&
+                data.problems && typeof data.problems === 'object' && !Array.isArray(data.problems) &&
+                Object.values(data.problems).every(value => typeof value === 'string');
+        }
+
+        function hasSeasonConfig(config) {
+            return typeof config?.activeSeasonId === 'string' && Array.isArray(config.seasonRules) &&
+                config.seasonRules.every(rule => rule && typeof rule.start === 'string' &&
+                    typeof rule.end === 'string' && typeof rule.seasonId === 'string');
+        }
+
+        function restoreMaterialLibrary(sid) {
+            if (sid !== DEFAULT_MATERIAL_SHEET || materialLibraryReady) return;
+            try {
+                const snapshot = JSON.parse(localStorage.getItem(MATERIAL_SNAPSHOT_KEY) || 'null');
+                const age = Date.now() - snapshot?.savedAt;
+                const problems = JSON.parse(localStorage.getItem('r8m2_data_main') || 'null');
+                if (snapshot?.sid !== sid || !(age >= 0 && age < MATERIAL_SNAPSHOT_MAX_AGE) ||
+                    !hasSeasonConfig(snapshot.config) || !isMaterialResponse({ problems }) ||
+                    !Object.keys(problems).length) return;
+                runtimeConfigState = snapshot.config;
+                window.renderEraMenu();
+                materialLibraryReady = true;
+            } catch (error) {
+                console.warn('[materials] Skipped unreadable local snapshot');
+            }
+        }
+
+        function displaySyncedMaterials(data, sid) {
+            const problems = sanitizeProblemSheets(data.problems);
+            localStorage.removeItem(MATERIAL_SNAPSHOT_KEY);
+            localStorage.setItem('r8m2_data_main', JSON.stringify(problems));
+            if (Array.isArray(data.imageMap)) {
+                imageMapById = normalizeImageMap(data.imageMap);
+                localStorage.setItem('r8m2_image_map', JSON.stringify(data.imageMap));
+            }
+            if (Array.isArray(data.sheetOrder)) {
+                localStorage.setItem('r8m2_sheet_order', JSON.stringify(sanitizeSheetOrder(data.sheetOrder)));
+            }
+            if (sid === DEFAULT_MATERIAL_SHEET && hasSeasonConfig(data.config)) {
+                const { activeSeasonId, seasonRules } = data.config;
+                localStorage.setItem(MATERIAL_SNAPSHOT_KEY, JSON.stringify({
+                    sid, savedAt: Date.now(), config: { activeSeasonId, seasonRules }
+                }));
+            }
+            updateRuntimeConfigUI(data.config || null);
+            window.renderEraMenu();
+            materialLibraryReady = Object.keys(problems).length > 0;
+        }
+
+        async function requestProblemSync(action, sid, userId, timeoutMs) {
+            const params = new URLSearchParams({ action, id: sid });
+            if (userId) params.set('userId', userId);
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), timeoutMs);
+            try {
+                const response = await fetch(`${FIXED_GAS_URL}?${params}`, { signal: controller.signal });
+                if (!response.ok) throw new Error('同期先のHTTPエラー: ' + response.status);
+                return await response.json();
+            } finally {
+                clearTimeout(timeout);
+            }
+        }
+
+        function applySyncedHistory(result, statsAtStart) {
+            Object.entries(result.userStats || {}).forEach(([key, s]) => {
+                // A late response must not replace an answer made while the read was pending.
+                if (questionStats[key] !== statsAtStart[key]) return;
+                questionStats[key] = {
+                    total: parseInt(s.total) || 0,
+                    correct: parseInt(s.correct) || 0,
+                    wrong_streak: parseInt(s.wrong_streak) || 0,
+                    last_wrong_at: s.last_wrong_at ? parseInt(s.last_wrong_at) : null,
+                    last_right_at: s.last_right_at ? parseInt(s.last_right_at) : null,
+                    due_at: s.due_at ? parseInt(s.due_at) : null
+                };
             });
+            cumulativeHistory = Array.isArray(result.history) ? result.history : [];
+            userHistory = Array.isArray(result.seasonHistory) ? result.seasonHistory : cumulativeHistory;
+            lifetimeSummaryState = result.lifetimeSummary || { totalExp: 0, sessionCount: cumulativeHistory.length, seasonExp: 0, seasonSessionCount: userHistory.length };
+            pastSeasonRankings = Array.isArray(result.pastSeasonRankings) ? result.pastSeasonRankings : [];
+            lifetimeRankingData = Array.isArray(result.lifetimeRanking) ? result.lifetimeRanking : [];
+            if (Array.isArray(result.ranking)) rankingData = result.ranking;
+            if (lifetimeRankingData.length === 0) lifetimeRankingData = buildFallbackLifetimeRanking();
+            window.currentStreak = result.currentStreak || 0;
+            window.maxStreak = result.maxStreak || 0;
+            quitCountState = Number(result.quitCount) || 0;
+            updateStatsUI();
+            window.renderEraMenu();
+        }
+
+        async function syncAllFromSpreadsheetInternal(request, isAuto) {
+            const { sid, userId } = request;
+            const current = () => activeSync === request;
+            const statsAtStart = { ...questionStats };
+            restoreMaterialLibrary(sid);
+            setLibrarySyncStatus(materialLibraryReady ? '学習履歴・ランキングを読み込み中…' : '教材を読み込み中…');
+            let result;
+            try {
+                if (sid === DEFAULT_MATERIAL_SHEET) {
+                    try {
+                        const materials = await requestProblemSync('syncMaterials', sid, '', 15000);
+                        if (!current()) return;
+                        if (isMaterialResponse(materials) && materials.syncStage === 'materials' &&
+                            hasSeasonConfig(materials.config) && Array.isArray(materials.sheetOrder)) {
+                            displaySyncedMaterials(materials, sid);
+                            request.materialsApplied = true;
+                            setLibrarySyncStatus('学習履歴・ランキングを読み込み中…');
+                            result = await requestProblemSync('syncStats', sid, userId, 65000);
+                            if (!current()) return;
+                            if (result?.syncStage === 'stats' && !result.error && Array.isArray(result.history) &&
+                                Array.isArray(result.ranking)) {
+                                applySyncedHistory(result, statsAtStart);
+                                setLibrarySyncStatus('');
+                                return;
+                            }
+                            result = null;
+                        } else if (!userId && isMaterialResponse(materials) && !materials.syncStage) {
+                            result = materials;
+                        }
+                    } catch (error) {
+                        if (!current()) return;
+                        // If materials are already usable, a failed background read must not block them.
+                        if (result?.syncStage === 'stats' || materialLibraryReady && request.materialsApplied) throw error;
+                    }
+                }
+                if (!result) result = await requestProblemSync('sync', sid, userId, 65000);
+                if (!current()) return;
+                if (!isMaterialResponse(result)) throw new Error('問題集用の同期応答を取得できませんでした。');
+                displaySyncedMaterials(result, sid);
+                applySyncedHistory(result, statsAtStart);
+                setLibrarySyncStatus('');
+            } catch (error) {
+                if (!current()) return;
+                setLibrarySyncStatus(materialLibraryReady ?
+                    '学習履歴・ランキングを更新できませんでした。' : '教材を取得できませんでした。');
+                if (!isAuto || !materialLibraryReady) showDiagnosticError(error, isAuto);
+            }
+        }
+
+        window.syncAllFromSpreadsheet = (isAuto = false, { force = false } = {}) => {
+            if (!FIXED_GAS_URL) return;
+            const url = getEl('main-spreadsheet-url')?.value || FIXED_SPREADSHEET_URL;
+            const sid = url.match(/\/d\/([\w-]+)/)?.[1];
+            if (!sid) {
+                if (!isAuto) showModal('Sync Error', 'スプレッドシートURLが正しくありません。');
+                return;
+            }
+            const userId = USER_NAME && USER_CLASS && USER_NUMBER ? `${USER_CLASS}-${USER_NUMBER}-${USER_NAME}` : '';
+            if (!force && activeSync?.sid === sid && activeSync.userId === userId) return activeSync.promise;
+            if (activeSync && activeSync.sid !== sid) materialLibraryReady = false;
+            const request = { sid, userId, materialsApplied: false };
+            activeSync = request;
+            request.promise = syncAllFromSpreadsheetInternal(request, isAuto).finally(() => {
+                if (activeSync === request) activeSync = null;
+            });
+            return request.promise;
         };
-        
+
         function shuffleArray(array) { for (let i = array.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [array[i], array[j]] = [array[j], array[i]]; } return array; }
 
         const praiseWords = {

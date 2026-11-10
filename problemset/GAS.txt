@@ -11,6 +11,11 @@ SCIENCE ULTRA プロキシ V9.8 (v2.7) - 科学版
 function doGet(e) {
 try {
 const action = e.parameter.action;
+if (action === 'syncMaterials' || action === 'syncStats') {
+  if (e.parameter.id !== '1LCGCVjeiTicyclXFTP0EaxxB_RluZJrveWPo1FdLzsk') return returnJson({ error: 'Unsupported spreadsheet for staged sync' });
+  return handleSync(e.parameter.id, action === 'syncStats' ? (e.parameter.userId || '') : '',
+    action === 'syncStats' ? 'stats' : 'materials');
+}
 if (action === 'getHistoryReview') return handleHistoryReview(e.parameter);
 if (action === 'logAll') return handleLogAll(e.parameter);
 if (action === 'logQuit') return handleLogQuit(e.parameter);
@@ -74,8 +79,9 @@ function parseSeasonUnitKey(value) {
   // M2の「1-0」とH2の「01」の両方を、シーズン規則の比較用数値へ正規化する。
   const match = normalized.match(/^(\d+)(?:\s*-\s*(\d+))?/);
   if (!match) return null;
-  const unitNumber = Number(match[2] || match[1]);
-  return isNaN(unitNumber) ? null : unitNumber;
+  const major = Number(match[1]);
+  const minor = Number(match[2] || 0);
+  return Number.isSafeInteger(major) && Number.isSafeInteger(minor) ? [major, minor] : null;
 }
 
 function isH2ProblemsetProfile(runtimeConfig) {
@@ -89,7 +95,7 @@ function isH2ProblemsetProfile(runtimeConfig) {
 }
 
 function getSystemSheetNames(runtimeConfig) {
-  const names = ["履歴ログ", "詳細履歴ログ", "問題別統計DB", "成績一覧", "メンバー一覧", "設定", "画像管理", "中断ログ", "管理操作", "管理ログ"];
+  const names = ["履歴ログ", "詳細履歴ログ", "問題別統計DB", "成績一覧", "メンバー一覧", "設定", "画像管理", "中断ログ", "管理操作", "管理ログ", "AI質問"];
   if (!isH2ProblemsetProfile(runtimeConfig)) {
     names.push("記述問題", "記述履歴ログ");
   }
@@ -130,8 +136,10 @@ function resolveSeasonIdByEra(eraName, seasonRules) {
     const startNumber = parseSeasonUnitKey(rules[i].start);
     const endNumber = parseSeasonUnitKey(rules[i].end);
     if (startNumber === null) continue;
-    const startsOk = unitNumber >= startNumber;
-    const endsOk = endNumber === null || unitNumber <= endNumber;
+    const startsOk = unitNumber[0] > startNumber[0] ||
+      (unitNumber[0] === startNumber[0] && unitNumber[1] >= startNumber[1]);
+    const endsOk = endNumber === null || unitNumber[0] < endNumber[0] ||
+      (unitNumber[0] === endNumber[0] && unitNumber[1] <= endNumber[1]);
     if (startsOk && endsOk) return String(rules[i].seasonId || '').trim();
   }
   return "";
@@ -646,7 +654,7 @@ function countQuitRowsForUser(quitSheet, userId) {
   return count;
 }
 
-function handleSync(ssId, userId) {
+function handleSync(ssId, userId, stage) {
 try {
 if (!ssId || ssId.trim() === '') {
   return returnJson({ error: "Invalid argument: id - スプレッドシートIDが必要です" });
@@ -658,11 +666,12 @@ try {
 } catch (openError) {
   return returnJson({ error: "Invalid argument: id - スプレッドシートが見つかりません。IDを確認してください: " + openError.toString() });
 }
-ensureDefaultConfigRows(ss);
+if (!stage) ensureDefaultConfigRows(ss);
 const runtimeConfig = readRuntimeConfigFromSheet(ss);
 const activeSeasonId = normalizeActiveSeasonId(runtimeConfig.activeSeasonId);
 const result = { problems: {}, userStats: {}, history: [], seasonHistory: [], ranking: [], pastSeasonRankings: [], lifetimeRanking: [], currentStreak: 0, maxStreak: 0, quitCount: 0, sheetOrder: [], imageMap: [] };
 result.config = {
+    seasonRules: runtimeConfig.seasonRules || SCIENCE_DEFAULT_SEASON_RULES,
   appUrl: runtimeConfig.appUrl || "",
   perSetPerfectCap: Number(runtimeConfig.perSetPerfectCap) || 5,
   dailyGrantLimit: Number(runtimeConfig.dailyGrantLimit) || 3,
@@ -681,6 +690,7 @@ result.lifetimeSummary = {
   seasonExp: 0,
   seasonSessionCount: 0
 };
+if (stage !== 'stats') {
 result.imageMap = readImageMapFromSheet(ss);
 
 // システム用シートを除外するリスト
@@ -772,6 +782,17 @@ result.debug = {
 };
 
 // 自分の統計
+}
+if (stage === 'materials') {
+  return returnJson({
+    syncStage: 'materials',
+    problems: result.problems,
+    sheetOrder: result.sheetOrder,
+    imageMap: result.imageMap,
+    config: result.config
+  });
+}
+
 const statsSheet = ss.getSheetByName("問題別統計DB");
 if (statsSheet) {
   const sData = statsSheet.getDataRange().getValues();
@@ -1138,6 +1159,12 @@ if (detailSheetSync) {
 const quitCountMapForSync = buildQuitCountMap(ss);
 result.quitCount = quitCountMapForSync[String(userId)] || 0;
 
+if (stage === 'stats') {
+  result.syncStage = 'stats';
+  delete result.problems;
+  delete result.sheetOrder;
+  delete result.imageMap;
+}
 return returnJson(result);
 
 
