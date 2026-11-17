@@ -2619,6 +2619,12 @@ function m2UnitLabel_(raw) {
             return problems;
         }
 
+        // Keep the original row for historical answers keyed by the question's position.
+        function isM2PracticeQuestion_(question) {
+            return question.id !== "2-7排出-7" ||
+                question.question !== "腎臓では、血液からこし出された液にブドウ糖や水分も含まれる。通常はその多くが血液へ戻される。仮に、こし出す量は変わらず、ブドウ糖と水分を血液へ戻すはたらきだけがなくなったとすると、尿に出るブドウ糖の量と尿量は通常に比べてどうなるか。";
+        }
+
         const librarySeasonOpen = new Map();
         let librarySeasonSignature = '';
         window.renderEraMenu = () => {
@@ -2756,9 +2762,9 @@ function m2UnitLabel_(raw) {
             
             // 各分野（シート名）を表示
             categories.forEach((categoryName) => {
-                const categoryProblems = categoryName === M2_EARTH_SET
+                const categoryProblems = (categoryName === M2_EARTH_SET
                     ? M2_EARTH_SOURCES.flatMap(era => masterDataTotal.filter(d => d.era === era))
-                    : masterDataTotal.filter(d => d.era === categoryName);
+                    : masterDataTotal.filter(d => d.era === categoryName)).filter(isM2PracticeQuestion_);
                 
                 // Weak Pointsモードの場合は、通常のメニュー表示をスキップ（後で専用UIを表示）
                 if (isWeakPointsMode) {
@@ -2847,7 +2853,7 @@ function m2UnitLabel_(raw) {
             const todayTimestamp = today.getTime();
             
             // 全問題を取得
-            const allProblems = [...masterDataTotal];
+            const allProblems = masterDataTotal.filter(isM2PracticeQuestion_);
             
             // 各問題をカテゴリに分類
             const categoryA = []; // wrong_streak >= 2
