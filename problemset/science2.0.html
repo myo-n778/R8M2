@@ -1383,20 +1383,15 @@
                 : [];
         }
 
-var M2_EARTH_SET = '3-6地学応用';
 var M2_EARTH_SOURCES = [
   '3-6気圧・圧力と水蒸気(応用確認)',
   '3-7気象観測・天気図・前線(応用確認)',
   '3-8日本の気象(応用確認)'
 ];
 
-function m2CombinedUnit_(name) {
-  return M2_EARTH_SOURCES.indexOf(name) >= 0 ? M2_EARTH_SET : name;
-}
-
 function m2UnitLabel_(raw) {
   var name = String(raw || '');
-  if (m2CombinedUnit_(name) === M2_EARTH_SET) return M2_EARTH_SET;
+  if (M2_EARTH_SOURCES.indexOf(name) >= 0) return name;
   if (/^(?:\d+-\d+\s*)?生物後半\s*[(（]\s*応用確認\s*[)）]$/.test(name.trim())) return '2-9生物応用';
   return name.replace(/[(（]\s*応用確認\s*[)）]/g,'(応用)').replace(/\s*[(（]\s*基本\s*[)）]/g,'');
 }
@@ -2726,9 +2721,6 @@ function m2UnitLabel_(raw) {
                 categories = allSheetNames;
             }
             
-            if (M2_EARTH_SOURCES.every(era => masterDataTotal.some(q => q.era === era))) {
-                categories = Array.from(new Set(categories.map(m2CombinedUnit_)));
-            }
             console.log('表示するカテゴリ順序:', categories);
             
             const eraSessionStats = buildEraSessionStats(userHistory);
@@ -2762,9 +2754,7 @@ function m2UnitLabel_(raw) {
             
             // 各分野（シート名）を表示
             categories.forEach((categoryName) => {
-                const categoryProblems = (categoryName === M2_EARTH_SET
-                    ? M2_EARTH_SOURCES.flatMap(era => masterDataTotal.filter(d => d.era === era))
-                    : masterDataTotal.filter(d => d.era === categoryName)).filter(isM2PracticeQuestion_);
+                const categoryProblems = masterDataTotal.filter(d => d.era === categoryName && isM2PracticeQuestion_(d));
                 
                 // Weak Pointsモードの場合は、通常のメニュー表示をスキップ（後で専用UIを表示）
                 if (isWeakPointsMode) {
