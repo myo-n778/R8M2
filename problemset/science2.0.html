@@ -671,6 +671,7 @@
         let currentSessionEra = ""; let currentSessionRangeLabel = "";
         let userHistory = [];
         let cumulativeHistory = [];
+        let unitHistory = null;
         let lifetimeSummaryState = { totalExp: 0, sessionCount: 0, seasonExp: 0, seasonSessionCount: 0 };
         let questionStats = {};
         let rankingData = [];
@@ -1723,6 +1724,7 @@ function m2UnitLabel_(raw) {
             isRankingPublic = true;
             userHistory = [];
             cumulativeHistory = [];
+            unitHistory = null;
             lifetimeSummaryState = { totalExp: 0, sessionCount: 0, seasonExp: 0, seasonSessionCount: 0 };
             questionStats = {};
             localStorage.removeItem('ethics_user_name');
@@ -1811,14 +1813,15 @@ function m2UnitLabel_(raw) {
 
         window.historyReviewPanel = window.HistoryReview.mount(document.getElementById('history-review-list'), () => ({
             userId: currentStudentCode(),
-            history: cumulativeHistory, questions: masterDataTotal, images: imageMapById, math: renderMath, formatEra: m2UnitLabel_,
+            history: unitHistory || cumulativeHistory, questions: masterDataTotal, images: imageMapById, math: renderMath, formatEra: m2UnitLabel_,
             load: async entry => {
                 const spreadsheetUrl = getEl('main-spreadsheet-url')?.value || FIXED_SPREADSHEET_URL;
                 const id = spreadsheetUrl.match(/\/d\/([a-zA-Z0-9-_]+)/)?.[1];
                 if (!id) throw new Error('スプレッドシートを確認してください。');
                 const response = await fetch(`${FIXED_GAS_URL}?${new URLSearchParams({
                     action: 'getHistoryReview', id, userId: currentStudentCode(),
-                    timestamp: String(entry.timestamp), era: entry.summaryEra, range: entry.summaryRange
+                    timestamp: String(entry.timestamp), era: entry.summaryEra, range: entry.summaryRange,
+                    earthUnit: entry.earthUnit ? '1' : '0'
                 })}`, { signal: AbortSignal.timeout(30000) });
                 if (!response.ok) throw new Error('履歴を取得できませんでした。');
                 return response.json();
@@ -2723,7 +2726,9 @@ function m2UnitLabel_(raw) {
             
             console.log('表示するカテゴリ順序:', categories);
             
-            const eraSessionStats = buildEraSessionStats(userHistory);
+            const eraSessionStats = buildEraSessionStats(unitHistory
+                ? unitHistory.filter(h => h.seasonId === lifetimeSummaryState.activeSeasonId)
+                : userHistory);
             const seasonParents = new Map();
             if (!isWeakPointsMode) {
                 const groups = SHARED.groupErasBySeason?.(categories, runtimeConfigState);
@@ -3489,6 +3494,7 @@ function m2UnitLabel_(raw) {
                 };
             });
             cumulativeHistory = Array.isArray(result.history) ? result.history : [];
+            unitHistory = Array.isArray(result.unitHistory) ? result.unitHistory : null;
             userHistory = Array.isArray(result.seasonHistory) ? result.seasonHistory : cumulativeHistory;
             lifetimeSummaryState = result.lifetimeSummary || { totalExp: 0, sessionCount: cumulativeHistory.length, seasonExp: 0, seasonSessionCount: userHistory.length };
             pastSeasonRankings = Array.isArray(result.pastSeasonRankings) ? result.pastSeasonRankings : [];
